@@ -35,12 +35,12 @@
     - These 4 bytes store the size of the subsequent GZip stream
     - This information is unnecessary and can be safely **discarded** during deserialization
       - **Note:** RAGS Designer requires this information for its internal GZip decompression — the default value of `16 MiB` can be optionally increased to allow for massively complex RAGS Actions
-      - It is **highly recommended** not to decrease the value below the default — there is no benefit to either performance or memory usage, and too-low values may cause crashes if the RAGS Designer needs to load a complex RAGS Action
     - When serializing, the padding value is set to a *default static value* (`FF FF FF 00` — `16777215` in little-endian unsigned int, sufficient for a `16 MiB` GZip stream)
       - An optional parameter is available to set a *custom padding value* (maximum value limited to `FF FF FF 7F` — `2147483647` in little-endian unsigned int, indicating a `2 GiB` GZip stream)
-  - All *subsequent bytes* after the padding represent a **standard GZip stream** containing **XML** data
+      - *Lowering* the padding value below the default is *not supported*
+  - All *subsequent bytes* after the padding represent a **standard GZip stream** containing an **XML** snippet (with no XML declaration)
     - The GZip stream may be compressed with *any compression level*, but **Default** compression levels are recommended when serializing
-  - The XML data is usually *stored linearized* and is *pretty-printed during deserialization*
+  - The XML snippet is usually *stored linearized* and is *pretty-printed during deserialization*
 
 ## YAML serialization/deserialization rules
 
