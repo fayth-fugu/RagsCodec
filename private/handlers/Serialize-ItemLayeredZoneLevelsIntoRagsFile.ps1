@@ -9,16 +9,23 @@ function Serialize-ItemLayeredZoneLevelsIntoRagsFile {
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
-    .PARAMETER RagsFileConnection
-    Connection to the RAGS file to serialize the ItemLayeredZoneLevels data from.
+    .PARAMETER SourcePath
+    Path of the folder to serialize the ItemLayeredZoneLevels data from.
+
+    .PARAMETER RagsConnection
+    An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),
+    as returned by Open-RagsFileConnection.
 
     .EXAMPLE
-    Serialize-ItemLayeredZoneLevelsIntoRagsFile -RagsFileConnection $connection
+    Serialize-ItemLayeredZoneLevelsIntoRagsFile -SourcePath 'C:\Export\MyGame' -RagsConnection $openRagsConnection
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [psobject]$RagsFileConnection
+        [string]$SourcePath,
+
+        [Parameter(Mandatory = $true)]
+        [System.Data.OleDb.OleDbConnection]$RagsConnection
     )
 
     Write-Host 'TODO: Implement Serialize-ItemLayeredZoneLevelsIntoRagsFile.'

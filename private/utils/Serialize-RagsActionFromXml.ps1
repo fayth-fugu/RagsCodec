@@ -65,7 +65,6 @@ function Serialize-RagsActionFromXml {
     #>
     [CmdletBinding()]
     [OutputType([System.String])]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]

@@ -40,7 +40,6 @@ function Deserialize-RagsActionIntoXml {
     #>
     [CmdletBinding()]
     [OutputType([System.String])]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]

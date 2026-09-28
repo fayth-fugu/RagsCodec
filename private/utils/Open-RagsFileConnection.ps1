@@ -36,7 +36,6 @@ function Open-RagsFileConnection {
     #>
     [CmdletBinding()]
     [OutputType('System.Data.OleDb.OleDbConnection')]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', '')]
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path
