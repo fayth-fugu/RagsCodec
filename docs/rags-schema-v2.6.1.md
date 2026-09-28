@@ -1,5 +1,9 @@
 # Database schema — Rapid Adventure Game System (RAGS) file version 2.6.1
 
+## Password
+
+RAGS files use a standard password "Ç°¥àòÅÅÇÉàññø" (as of RAGS version 2.6.1)
+
 ## Tables
 
 - `CharacterActions`
