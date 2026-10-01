@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Compress-CharacterPropertiesIntoRagsFile {
     <#
     .SYNOPSIS
-    Serializes CharacterProperties data into a RagsFile.
+    Compresses CharacterProperties data into a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER SourcePath
-    Path of the folder to serialize the CharacterProperties data from.
+    Path of the folder to compress the CharacterProperties data from.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Compress-TimerIntoRagsFile {
     <#
     .SYNOPSIS
-    Serializes Timer data into a RagsFile.
+    Compresses Timer data into a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER SourcePath
-    Path of the folder to serialize the Timer data from.
+    Path of the folder to compress the Timer data from.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Expand-GameDataFromRagsFile {
     <#
     .SYNOPSIS
-    Deserializes GameData data from a RagsFile.
+    Expands GameData data from a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER OutputPath
-    Path of the folder containing the exported GameData data to deserialize.
+    Path of the folder to export the expanded GameData data into.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

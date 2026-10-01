@@ -4,15 +4,15 @@ Set-StrictMode -Version Latest
 function Compress-RagsActionFromXml {
     <#
     .SYNOPSIS
-    Serializes the XML representation of a RAGS action into its encoded form.
+    Compresses the XML representation of a RAGS action into its encoded form.
 
     .DESCRIPTION
-    Serializes an XML snippet back into the encoded RAGS action form stored in
+    Compresses an XML snippet back into the encoded RAGS action form stored in
     columns tagged with the RagsAction handling instruction.
 
     The input is first verified to contain a well-formed XML snippet. The XML
     snippet is usually stored linearized (it is pretty-printed during
-    deserialization), so it is linearized here before being encoded.
+    expansion), so it is linearized here before being encoded.
 
     The encoded value is a Base64-encoded binary stream with the following
     structure:
@@ -36,7 +36,7 @@ function Compress-RagsActionFromXml {
     with or without one.
 
     .PARAMETER XmlRagsAction
-    The XML snippet to serialize into its encoded RAGS action form. The value
+    The XML snippet to compress into its encoded RAGS action form. The value
     is verified to be a well-formed XML snippet before it is encoded; an XML
     declaration is optional.
 
@@ -54,13 +54,13 @@ function Compress-RagsActionFromXml {
     .EXAMPLE
     PS> $encodedAction = Compress-RagsActionFromXml -XmlRagsAction $actionXml
 
-    Serializes the XML snippet in $actionXml into its Base64-encoded RAGS
+    Compresses the XML snippet in $actionXml into its Base64-encoded RAGS
     action form, using the default padding value.
 
     .EXAMPLE
     PS> $encodedAction = Compress-RagsActionFromXml -XmlRagsAction $actionXml -CustomPaddingSize 536870912
 
-    Serializes the XML snippet using a custom padding value advertising a
+    Compresses the XML snippet using a custom padding value advertising a
     capacity for a 512 MiB GZip stream.
     #>
     [CmdletBinding()]
@@ -78,11 +78,11 @@ function Compress-RagsActionFromXml {
     $maximumPaddingSize = 2147483647
 
     if ($CustomPaddingSize -lt $minimumPaddingSize) {
-        throw "Cannot serialize the RAGS action: the custom padding size $CustomPaddingSize is lower than the default value of $minimumPaddingSize; lowering the padding value below the default is not supported."
+        throw "Cannot compress the RAGS action: the custom padding size $CustomPaddingSize is lower than the default value of $minimumPaddingSize; lowering the padding value below the default is not supported."
     }
 
     if ($CustomPaddingSize -gt $maximumPaddingSize) {
-        throw "Cannot serialize the RAGS action: the custom padding size $CustomPaddingSize exceeds the maximum supported value of $maximumPaddingSize."
+        throw "Cannot compress the RAGS action: the custom padding size $CustomPaddingSize exceeds the maximum supported value of $maximumPaddingSize."
     }
 
     # Trim surrounding whitespace so that values carried over from pretty-
@@ -90,7 +90,7 @@ function Compress-RagsActionFromXml {
     $xmlValue = $XmlRagsAction.Trim()
 
     if ([string]::IsNullOrEmpty($xmlValue)) {
-        throw 'Cannot serialize the RAGS action: the input XML snippet is empty.'
+        throw 'Cannot compress the RAGS action: the input XML snippet is empty.'
     }
 
     # Verify that the input contains a well-formed XML snippet. The document
@@ -109,14 +109,14 @@ function Compress-RagsActionFromXml {
                 $xmlValue
             }
 
-        $message = "Cannot serialize the RAGS action: the input value '$displayValue' is not a well-formed XML snippet. "
+        $message = "Cannot compress the RAGS action: the input value '$displayValue' is not a well-formed XML snippet. "
         $message += "The XML parser reported the following error: '$($_.Exception.Message)'."
 
         throw [System.Exception]::new($message, $_.Exception)
     }
 
     # Linearize the XML snippet (it is usually stored linearized and was
-    # pretty-printed during deserialization). A writer created over a string
+    # pretty-printed during expansion). A writer created over a string
     # builder regenerates the XML declaration with its own (wrong) encoding,
     # so the declaration is suppressed here; documents without one stay free
     # of one, and a declaration present on the input is preserved verbatim by
@@ -136,7 +136,7 @@ function Compress-RagsActionFromXml {
         $xmlDocument.Save($xmlWriter)
     }
     catch {
-        $message = 'Cannot serialize the RAGS action: the XML snippet could not be linearized. '
+        $message = 'Cannot compress the RAGS action: the XML snippet could not be linearized. '
         $message += "The XML writer reported the following error: '$($_.Exception.Message)'."
 
         throw [System.Exception]::new($message, $_.Exception)
@@ -162,14 +162,14 @@ function Compress-RagsActionFromXml {
     $gzipStream = $null
     try {
         $compressedStream = [System.IO.MemoryStream]::new()
-        # Default (Optimal) compression level, as recommended for serializing.
+        # Default (Optimal) compression level, as recommended.
         $gzipStream = [System.IO.Compression.GZipStream]::new($compressedStream, [System.IO.Compression.CompressionLevel]::Optimal, $true)
         $gzipStream.Write($xmlBytes, 0, $xmlBytes.Length)
         $gzipStream.Dispose()
         $gzipStream = $null
     }
     catch {
-        $message = 'Cannot serialize the RAGS action: the XML snippet could not be GZip-compressed. '
+        $message = 'Cannot compress the RAGS action: the XML snippet could not be GZip-compressed. '
         $message += "The GZip encoder reported the following error: '$($_.Exception.Message)'."
 
         throw [System.Exception]::new($message, $_.Exception)
@@ -186,13 +186,13 @@ function Compress-RagsActionFromXml {
     # MemoryStream.ToArray remains callable after disposal.
     $gzipBytes = $compressedStream.ToArray()
     if ($gzipBytes.Length -eq 0) {
-        throw 'Cannot serialize the RAGS action: the GZip stream was empty.'
+        throw 'Cannot compress the RAGS action: the GZip stream was empty.'
     }
 
     # RAGS Designer requires the advertised capacity to cover the GZip stream;
     # the default padding is sufficient for all but massively complex actions.
     if ($gzipBytes.Length -gt $CustomPaddingSize) {
-        Write-Warning "The GZip stream of the serialized RAGS action is $($gzipBytes.Length) byte(s) long, which exceeds the $($CustomPaddingSize) byte(s) advertised by the padding value; consider increasing -CustomPaddingSize for massively complex RAGS actions."
+        Write-Warning "The GZip stream of the compressed RAGS action is $($gzipBytes.Length) byte(s) long, which exceeds the $($CustomPaddingSize) byte(s) advertised by the padding value; consider increasing -CustomPaddingSize for massively complex RAGS actions."
     }
 
     # Assemble the padded stream: 4 bytes of little-endian padding followed by
@@ -202,7 +202,7 @@ function Compress-RagsActionFromXml {
     [Array]::Copy($paddingBytes, 0, $ragsActionBytes, 0, 4)
     [Array]::Copy($gzipBytes, 0, $ragsActionBytes, 4, $gzipBytes.Length)
 
-    Write-Verbose ("Serialized the RAGS action into a {0}-byte stream (4 padding bytes + {1} GZip byte(s)) with a padding value of {2} (0x{2:X8})." -f $ragsActionBytes.Length, $gzipBytes.Length, $CustomPaddingSize)
+    Write-Verbose ("Compressed the RAGS action into a {0}-byte stream (4 padding bytes + {1} GZip byte(s)) with a padding value of {2} (0x{2:X8})." -f $ragsActionBytes.Length, $gzipBytes.Length, $CustomPaddingSize)
 
     return [System.Convert]::ToBase64String($ragsActionBytes)
 }

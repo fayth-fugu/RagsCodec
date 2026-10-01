@@ -4,7 +4,7 @@ Set-StrictMode -Version Latest
 function Expand-RagsActionIntoXml {
     <#
     .SYNOPSIS
-    Deserializes an encoded RAGS action back into its XML representation.
+    Expands an encoded RAGS action back into its XML representation.
 
     .DESCRIPTION
     Decodes an encoded RAGS action (as stored in columns tagged with the
@@ -26,7 +26,7 @@ function Expand-RagsActionIntoXml {
     the raw decompressed value is returned instead.
 
     .PARAMETER EncodedRagsAction
-    The Base64-encoded RAGS action to deserialize. The value is validated to
+    The Base64-encoded RAGS action to expand. The value is validated to
     be a valid Base64-encoded string before decoding.
 
     .OUTPUTS
@@ -51,7 +51,7 @@ function Expand-RagsActionIntoXml {
     $base64Value = $EncodedRagsAction.Trim()
 
     if ([string]::IsNullOrEmpty($base64Value)) {
-        throw 'Cannot deserialize the RAGS action: the encoded value is empty.'
+        throw 'Cannot expand the RAGS action: the encoded value is empty.'
     }
 
     # Validate the Base64 payload: Base64 digits only, with optional padding
@@ -68,7 +68,7 @@ function Expand-RagsActionIntoXml {
                 $base64Value
             }
 
-        throw "Cannot deserialize the RAGS action: the value '$displayValue' is not a valid Base64-encoded string."
+        throw "Cannot expand the RAGS action: the value '$displayValue' is not a valid Base64-encoded string."
     }
 
     $ragsActionBytes = [System.Convert]::FromBase64String($base64Value)
@@ -76,7 +76,7 @@ function Expand-RagsActionIntoXml {
     # The stream must at least carry the 4-byte padding and some GZip data.
     $paddingByteCount = 4
     if ($ragsActionBytes.Length -le $paddingByteCount) {
-        throw "Cannot deserialize the RAGS action: the decoded stream is $($ragsActionBytes.Length) byte(s) long, which is too short to contain the 4-byte padding followed by a GZip stream."
+        throw "Cannot expand the RAGS action: the decoded stream is $($ragsActionBytes.Length) byte(s) long, which is too short to contain the 4-byte padding followed by a GZip stream."
     }
 
     # The padding advertises the size of the GZip stream that follows it. The
@@ -91,12 +91,12 @@ function Expand-RagsActionIntoXml {
     # A GZip member always carries a 10-byte header and an 8-byte trailer, so
     # anything shorter than 18 bytes cannot be a GZip stream.
     if ($gzipStreamLength -lt 18) {
-        throw "Cannot deserialize the RAGS action: the data following the 4-byte padding is only ${gzipStreamLength} byte(s) long, which is too short to be a GZip stream."
+        throw "Cannot expand the RAGS action: the data following the 4-byte padding is only ${gzipStreamLength} byte(s) long, which is too short to be a GZip stream."
     }
 
     # The first two bytes of a GZip stream are fixed magic bytes (0x1F 0x8B).
     if (($ragsActionBytes[$gzipStreamOffset] -ne 0x1F) -or ($ragsActionBytes[$gzipStreamOffset + 1] -ne 0x8B)) {
-        throw 'Cannot deserialize the RAGS action: the data following the 4-byte padding does not begin with the GZip magic bytes (0x1F 0x8B), so it is not a GZip stream.'
+        throw 'Cannot expand the RAGS action: the data following the 4-byte padding does not begin with the GZip magic bytes (0x1F 0x8B), so it is not a GZip stream.'
     }
 
     Write-Verbose "Decompressing the ${gzipStreamLength}-byte GZip stream following the padding."
@@ -111,7 +111,7 @@ function Expand-RagsActionIntoXml {
         $gzipStream.CopyTo($decompressedStream)
     }
     catch {
-        $message = 'Cannot deserialize the RAGS action: the GZip stream following the 4-byte padding could not be decompressed. '
+        $message = 'Cannot expand the RAGS action: the GZip stream following the 4-byte padding could not be decompressed. '
         $message += "The GZip decoder reported the following error: '$($_.Exception.Message)'. "
         $message += 'Verify that the value is a RAGS action (a Base64-encoded stream of a 4-byte padding followed by GZip-compressed XML data).'
 
@@ -132,7 +132,7 @@ function Expand-RagsActionIntoXml {
     # MemoryStream.ToArray remains callable after disposal.
     $xmlBytes = $decompressedStream.ToArray()
     if ($xmlBytes.Length -eq 0) {
-        throw 'Cannot deserialize the RAGS action: the GZip stream decompressed to 0 bytes of XML data.'
+        throw 'Cannot expand the RAGS action: the GZip stream decompressed to 0 bytes of XML data.'
     }
 
     # Decode the XML payload. The payload may start with a byte-order mark

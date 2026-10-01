@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Expand-ItemGroupsFromRagsFile {
     <#
     .SYNOPSIS
-    Deserializes ItemGroups data from a RagsFile.
+    Expands ItemGroups data from a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER OutputPath
-    Path of the folder containing the exported ItemGroups data to deserialize.
+    Path of the folder to export the expanded ItemGroups data into.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

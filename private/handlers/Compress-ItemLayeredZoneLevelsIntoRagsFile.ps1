@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Compress-ItemLayeredZoneLevelsIntoRagsFile {
     <#
     .SYNOPSIS
-    Serializes ItemLayeredZoneLevels data into a RagsFile.
+    Compresses ItemLayeredZoneLevels data into a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER SourcePath
-    Path of the folder to serialize the ItemLayeredZoneLevels data from.
+    Path of the folder to compress the ItemLayeredZoneLevels data from.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

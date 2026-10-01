@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Compress-CharactersIntoRagsFile {
     <#
     .SYNOPSIS
-    Serializes Characters data into a RagsFile.
+    Compresses Characters data into a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER SourcePath
-    Path of the folder to serialize the Characters data from.
+    Path of the folder to compress the Characters data from.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

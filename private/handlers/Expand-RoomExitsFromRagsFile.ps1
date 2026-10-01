@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Expand-RoomExitsFromRagsFile {
     <#
     .SYNOPSIS
-    Deserializes RoomExits data from a RagsFile.
+    Expands RoomExits data from a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER OutputPath
-    Path of the folder containing the exported RoomExits data to deserialize.
+    Path of the folder to export the expanded RoomExits data into.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

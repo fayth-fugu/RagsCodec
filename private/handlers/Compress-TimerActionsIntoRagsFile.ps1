@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Compress-TimerActionsIntoRagsFile {
     <#
     .SYNOPSIS
-    Serializes TimerActions data into a RagsFile.
+    Compresses TimerActions data into a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER SourcePath
-    Path of the folder to serialize the TimerActions data from.
+    Path of the folder to compress the TimerActions data from.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

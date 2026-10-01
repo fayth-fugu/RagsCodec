@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Compress-VariablePropertiesIntoRagsFile {
     <#
     .SYNOPSIS
-    Serializes VariableProperties data into a RagsFile.
+    Compresses VariableProperties data into a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER SourcePath
-    Path of the folder to serialize the VariableProperties data from.
+    Path of the folder to compress the VariableProperties data from.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

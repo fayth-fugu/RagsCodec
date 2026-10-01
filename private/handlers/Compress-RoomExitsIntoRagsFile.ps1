@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Compress-RoomExitsIntoRagsFile {
     <#
     .SYNOPSIS
-    Serializes RoomExits data into a RagsFile.
+    Compresses RoomExits data into a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER SourcePath
-    Path of the folder to serialize the RoomExits data from.
+    Path of the folder to compress the RoomExits data from.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

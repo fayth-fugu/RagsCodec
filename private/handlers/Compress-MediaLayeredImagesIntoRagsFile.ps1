@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Compress-MediaLayeredImagesIntoRagsFile {
     <#
     .SYNOPSIS
-    Serializes MediaLayeredImages data into a RagsFile.
+    Compresses MediaLayeredImages data into a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER SourcePath
-    Path of the folder to serialize the MediaLayeredImages data from.
+    Path of the folder to compress the MediaLayeredImages data from.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

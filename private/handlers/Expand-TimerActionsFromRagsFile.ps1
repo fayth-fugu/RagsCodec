@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Expand-TimerActionsFromRagsFile {
     <#
     .SYNOPSIS
-    Deserializes TimerActions data from a RagsFile.
+    Expands TimerActions data from a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER OutputPath
-    Path of the folder containing the exported TimerActions data to deserialize.
+    Path of the folder to export the expanded TimerActions data into.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),

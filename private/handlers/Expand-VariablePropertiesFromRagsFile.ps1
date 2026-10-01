@@ -4,13 +4,13 @@ Set-StrictMode -Version Latest
 function Expand-VariablePropertiesFromRagsFile {
     <#
     .SYNOPSIS
-    Deserializes VariableProperties data from a RagsFile.
+    Expands VariableProperties data from a RagsFile.
 
     .DESCRIPTION
     Placeholder. This function is still to be implemented.
 
     .PARAMETER OutputPath
-    Path of the folder containing the exported VariableProperties data to deserialize.
+    Path of the folder to export the expanded VariableProperties data into.
 
     .PARAMETER RagsConnection
     An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),
