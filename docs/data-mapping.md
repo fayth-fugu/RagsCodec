@@ -13,20 +13,22 @@
 ## Special handling instructions
 
 - Columns tagged with the `Exclude` handling instruction are **excluded from deserialization** and ignored during serialization
-  - These columns are all auto-increment columns (currently) and do not need to be manually set
-- Columns tagged with the `List` handling instruction will group rows containing the same value and serve as the key for a **YAML sequence or mapping**
+- Columns tagged with the `List` handling instruction will group rows containing the same value and serve as the key for a **YAML sequence or mapping** (for *single-file deserializations*) or as the **filename** (for *subfolder deserializations*)
   - If the table has only **one** other non-`Exclude` column (in addition to the `List` column), a *YAML sequence* is generated
-  - If the table has **more than one** other non-`Exclude` column (in addition to the `List` column), a *YAML mapping* is generated (a `Unique` column needs to exist to serve as the key)
+  - If the table has **more than one** other non-`Exclude` column (in addition to the `List` column), a *YAML mapping* is generated
+    - A `Unique` column needs to exist to serve as the key
   - **Maximum one** `List` **column per table**
 - Columns tagged with the `Unique` handling instruction are expected to **contain only distinct values**
   - This is *soft-validated* during deserialization — a warning is shown if duplicate values are detected
-    - Tables are sorted before deserializing (refer to individual tables below for sorting conditions) and only the *first duplicate entry* is read
+    - Tables are sorted before deserializing and only the *first duplicate entry* is read
+      - Refer to individual tables below for sorting conditions
     - An optional parameter is available to throw an error and abort deserialization if duplicates are present
-  - If there are `List` and/or other `Unique` columns present, only the entire group needs to be distinct
-- Columns tagged with the `Xml` handling instruction may contain XML data
+  - If there are `List` and/or other `Unique` columns present, the columns are grouped together for distinctiveness checks
+- Columns tagged with the `Xml` handling instruction may contain XML data (with no XML declaration)
   - Data in these columns are *pretty-printed* during deserialization, then *linearized* during serialization
   - If pretty-printing/linearizing fails, then the *raw value* is read/written
-- Columns tagged with the `RagsAction` handling instruction contain encoded data which needs to be deserialized and serialized in a certain format — refer to the [format specification](#rags-action-format-specification) below
+- Columns tagged with the `RagsAction` handling instruction contain encoded data which needs a custom serializer/deserializer
+  - Refer to the [format specification](#rags-action-format-specification) below
 
 ## RAGS Action format specification
 
@@ -68,35 +70,27 @@
 
 - `{COLUMNNAME}` placeholders in YAML samples below are replaced with the actual column values during deserialization
 - `RagsAction`-containing tables (except for `PlayerActions`) are deserialized into individual subfolders containing multiple YAML files
-  - These tables usually contain lots of XML data, and deserializing into a single YAML file would result in too-large YAML files — bad for maintainability and version control
   - These YAML files are named using the values from the `List` column in each table
-  - `PlayerActions` is essentially `CharacterActions` for a single character, hence it is kept as a single file
-- `GUID` filename generation logic:
-  - `CharacterActions`, `Media` and `TimerActions` tables allow free text in their `List` column — this is a potential source of issues when deserializing into individual files, as the column's value may not be a valid filename
-  - To mitigate this issue, the column's value is first converted into a `GUID` before being used as a filename
-  - The column's value is first MD5-hashed, then the result of the hash is used to generate a `GUID`
+- `GUID` (Globally Unique Identifier) filename generation logic:
+  - `CharacterActions`, `Media` and `TimerActions` tables with `List` columns will have their column names converted to a `GUID` before being used as a filename
+  - The column is MD5-hashed, then the result used to generate a `GUID`
 
 ### Individual table handling
 
 - `CharacterActions`
   - Deserialized into a subfolder — `CharacterActions/`
-  - All distinct values are retrieved from the `Charname` column
-  - Filename generation:
-    - A YAML file is created for each distinct `Charname` value with the naming convention `{GUID}.yaml`
-      - The `GUID` value is converted from `Charname` as described above
-      - The `Charname` value is written to the YAML file as the first node
-  - Table retrieval:
-    - Table is sorted first by `Charname` ascending, then by `ID` ascending
-    - `Data` rows for each `Charname` are extracted using `RagsAction`-specific deserialization
-  - Structure of each `{GUID}.yaml` file:
-
+  - `List`-column handling: A YAML file is created for each distinct `Charname` value with the naming convention `{GUID}.yaml`
+    - The `GUID` value is converted from `Charname` as described above
+    - The `Charname` value is written to the YAML file as the first node
+  - Table is sorted first by `Charname` ascending, then by `ID` ascending
+  - `RagsAction`-column handling: All `Data` rows for each `Charname` are extracted using `RagsAction` deserialization
+  - Sample structure of each `{GUID}.yaml` file:
     ```yaml
     {Charname}:
       - {Data}
       - {Data}
       - ...
     ```
-
 - `CharacterProperties`
   - Deserialized into a single file — `CharacterProperties.yaml`
   - TODO
