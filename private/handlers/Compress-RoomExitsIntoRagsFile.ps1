@@ -13,7 +13,7 @@ function Compress-RoomExitsIntoRagsFile {
     Path of the folder to compress the RoomExits data from.
 
     .PARAMETER RagsConnection
-    An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),
+    An open SQL Server Compact connection to the RAGS file,
     as returned by Open-RagsFileConnection.
 
     .EXAMPLE
@@ -25,7 +25,7 @@ function Compress-RoomExitsIntoRagsFile {
         [string]$SourcePath,
 
         [Parameter(Mandatory = $true)]
-        [System.Data.OleDb.OleDbConnection]$RagsConnection
+        [System.Data.SqlServerCe.SqlCeConnection]$RagsConnection
     )
 
     Write-Host 'TODO: Implement Compress-RoomExitsIntoRagsFile.'

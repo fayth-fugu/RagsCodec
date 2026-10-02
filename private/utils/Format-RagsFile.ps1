@@ -8,19 +8,19 @@ function Format-RagsFile {
 
     .DESCRIPTION
     Deletes all rows of every table of a RAGS file (RAGS file schema version
-    2.6.1) through an open OLE DB connection to the
-    'Microsoft.SQLSERVER.CE.OLEDB.3.5' provider (as opened by
-    Open-RagsFileConnection). The table list is discovered from the schema
-    metadata of the connection; only tables of the TABLE type are considered,
-    and system tables and views are excluded. The schema (the tables and their
-    columns) of the file is left intact.
+    2.6.1) through an open managed SQL Server Compact connection to the SQL
+    Server Compact 3.5 database (as opened by Open-RagsFileConnection). The
+    table list is discovered from the INFORMATION_SCHEMA.TABLES metadata view
+    of the connection; only tables of the TABLE type are considered, and
+    system tables are excluded. The schema (the tables and their columns) of
+    the file is left intact.
 
     The deletion is attempted for every table. If the deletion failed for any
     of the tables, the function throws a single exception which lists every
     table which could not be emptied.
 
     .PARAMETER RagsConnection
-    An open OLE DB connection to a RAGS file, as returned by
+    An open SQL Server Compact connection to a RAGS file, as returned by
     Open-RagsFileConnection.
 
     .OUTPUTS
@@ -42,20 +42,22 @@ function Format-RagsFile {
     [OutputType([bool])]
     param(
         [Parameter(Mandatory = $true)]
-        [System.Data.OleDb.OleDbConnection]$RagsConnection
+        [System.Data.SqlServerCe.SqlCeConnection]$RagsConnection
     )
 
     if ($RagsConnection.State -ne [System.Data.ConnectionState]::Open) {
-        throw "Cannot format the RAGS file: the given OLE DB connection is not open (state '$($RagsConnection.State)'). Open a connection with Open-RagsFileConnection first."
+        throw "Cannot format the RAGS file: the given SQL Server Compact connection is not open (state '$($RagsConnection.State)'). Open a connection with Open-RagsFileConnection first."
     }
 
-    # Read the table metadata of the connected database. Only tables of the
-    # TABLE type are considered; system tables and views are excluded.
+    # Read the table metadata of the connected database from the SQL Server
+    # Compact INFORMATION_SCHEMA views. Only tables of the TABLE type are
+    # considered; system tables are excluded. Both the table name and the
+    # table type are selected, as the name is filtered on the type.
     Write-Verbose "Reading the table metadata of the RAGS file connected through '$($RagsConnection.DataSource)'."
     $tableNames = @(
-        $RagsConnection.GetOleDbSchemaTable([System.Data.OleDb.OleDbSchemaGuid]::Tables, $null).Rows |
-            Where-Object { $_.TABLE_TYPE -eq 'TABLE' } |
-            ForEach-Object { [string]$_.TABLE_NAME } |
+        Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [TABLE_NAME], [TABLE_TYPE] FROM [INFORMATION_SCHEMA].[TABLES]' |
+            Where-Object { $_['TABLE_TYPE'] -eq 'TABLE' } |
+            ForEach-Object { [string]$_['TABLE_NAME'] } |
             Sort-Object
     )
 

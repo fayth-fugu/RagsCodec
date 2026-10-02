@@ -12,14 +12,14 @@ function Assert-RagsFileStructure {
     is embedded in this function as static data; it mirrors
     'docs/rags-schema-v2.6.1.md' but is never read from disk at runtime.
 
-    The function queries the OLE DB schema metadata of the open connection
-    (an OLE DB connection to the 'Microsoft.SQLSERVER.CE.OLEDB.3.5' provider,
-    as opened by Open-RagsFileConnection) for the list of tables in the
-    database and for the properties of the columns of those tables, and then
-    crosschecks the metadata against the expected schema. For every expected
-    column, the column name, data type, maximum length (nvarchar columns
-    only), nullability, default value, and auto-increment setting are
-    validated.
+    The function queries the SQL Server Compact schema metadata of the open
+    connection (a managed System.Data.SqlServerCe connection to the SQL Server
+    Compact 3.5 database, as opened by Open-RagsFileConnection) for the list
+    of tables in the database and for the properties of the columns of those
+    tables, and then crosschecks the metadata against the expected schema. For
+    every expected column, the column name, data type, maximum length
+    (nvarchar columns only), nullability, default value, and auto-increment
+    setting are validated.
 
     Any of the following problems causes the function to throw a single
     exception which lists every problem found:
@@ -37,7 +37,7 @@ function Assert-RagsFileStructure {
     - A column has a default value although no default value is expected.
 
     .PARAMETER RagsConnection
-    An open OLE DB connection to a RAGS file, as returned by
+    An open SQL Server Compact connection to a RAGS file, as returned by
     Open-RagsFileConnection.
 
     .OUTPUTS
@@ -59,11 +59,11 @@ function Assert-RagsFileStructure {
     [OutputType([bool])]
     param(
         [Parameter(Mandatory = $true)]
-        [System.Data.OleDb.OleDbConnection]$RagsConnection
+        [System.Data.SqlServerCe.SqlCeConnection]$RagsConnection
     )
 
     if ($RagsConnection.State -ne [System.Data.ConnectionState]::Open) {
-        throw "Cannot assert the structure of a RAGS file: the given OLE DB connection is not open (state '$($RagsConnection.State)'). Open a connection with Open-RagsFileConnection first."
+        throw "Cannot assert the structure of a RAGS file: the given SQL Server Compact connection is not open (state '$($RagsConnection.State)'). Open a connection with Open-RagsFileConnection first."
     }
 
     # The expected structure of a RAGS file database (RAGS file schema version
@@ -300,71 +300,67 @@ function Assert-RagsFileStructure {
         )
     }
 
-    # Maps an OLE DB schema column row to the data type name used by the
-    # static expected schema above. The OLE DB data type codes used by SQL
-    # Server Compact 3.5 RAGS files are: int = 3, float = 5, bit = 11,
-    # image (binary) = 128 (with the sentinel character maximum length
-    # 1073741823), nvarchar/ntext = 130, datetime = 135. The two character
-    # types share the data type code 130 and are distinguished by the
-    # reported character maximum length: ntext columns report the sentinel
-    # value 536870911 instead of a real length.
+    # Maps a SQL Server Compact INFORMATION_SCHEMA.COLUMNS row (materialized
+    # as a hashtable by Get-RagsSchemaRowSet) to the data type name used by
+    # the static expected schema above. The INFORMATION_SCHEMA view reports
+    # the data type directly as a name string ('int', 'float', 'bit', 'image',
+    # 'nvarchar', 'ntext', or 'datetime'), so no type code mapping is needed.
     function Get-RagsSchemaTypeName {
         param(
             [Parameter(Mandatory = $true)]
-            [System.Data.DataRow]$Column
+            [hashtable]$Column
         )
 
-        $oleDbTypeCode = [int]$Column.DATA_TYPE
-        switch ($oleDbTypeCode) {
-            3   { return 'int' }
-            5   { return 'float' }
-            11  { return 'bit' }
-            128 { return 'image' }
-            135 { return 'datetime' }
-            130 {
-                $maxLength = $Column.CHARACTER_MAXIMUM_LENGTH
-                if (($null -ne $maxLength) -and ($maxLength -isnot [System.DBNull]) -and ([long]$maxLength -eq 536870911)) {
-                    return 'ntext'
-                }
-                return 'nvarchar'
-            }
-            default { return "unknown (OLE DB data type code $oleDbTypeCode)" }
+        $typeName = ([string]$Column['DATA_TYPE']).ToLowerInvariant()
+        switch ($typeName) {
+            'int'      { return 'int' }
+            'float'    { return 'float' }
+            'bit'      { return 'bit' }
+            'image'    { return 'image' }
+            'datetime' { return 'datetime' }
+            'nvarchar' { return 'nvarchar' }
+            'ntext'    { return 'ntext' }
+            default    { return "unknown (data type '$typeName')" }
         }
     }
 
-    # Returns the character maximum length of an OLE DB schema column row, or
-    # $null when the provider does not report a length for the column.
+    # Returns the character maximum length of a schema column row, or $null
+    # when the schema does not report a length for the column.
     function Get-RagsSchemaMaxLength {
         param(
             [Parameter(Mandatory = $true)]
-            [System.Data.DataRow]$Column
+            [hashtable]$Column
         )
 
-        $maxLength = $Column.CHARACTER_MAXIMUM_LENGTH
+        $maxLength = $Column['CHARACTER_MAXIMUM_LENGTH']
         if (($null -eq $maxLength) -or ($maxLength -is [System.DBNull])) {
             return $null
         }
         return [long]$maxLength
     }
 
-    # Returns the default value of an OLE DB schema column row, or $null when
-    # the column has no default value. The provider reports default values
-    # wrapped in parentheses, such as '(0)' or '(1)', and padded with
-    # whitespace; both are normalized away.
+    # Returns the default value of a schema column row, or $null when the
+    # column has no default value. The schema reports default values wrapped
+    # in parentheses, such as '(0)' or '(1)', and padded with whitespace; both
+    # are normalized away.
     function Get-RagsSchemaDefaultValue {
         param(
             [Parameter(Mandatory = $true)]
-            [System.Data.DataRow]$Column
+            [hashtable]$Column
         )
 
-        if (-not [bool]$Column.COLUMN_HASDEFAULT) {
+        $hasDefault = $Column['COLUMN_HASDEFAULT']
+        if (($null -eq $hasDefault) -or ($hasDefault -is [System.DBNull])) {
             return $null
         }
-        if ($Column.COLUMN_DEFAULT -is [System.DBNull]) {
+        if (-not [bool]$hasDefault) {
+            return $null
+        }
+        if ($Column['COLUMN_DEFAULT'] -is [System.DBNull]) {
             return $null
         }
 
-        $defaultValue = ([string]$Column.COLUMN_DEFAULT).Trim()
+        $defaultValue = ([string]$Column['COLUMN_DEFAULT']).Trim()
         if (($defaultValue.Length -ge 2) -and $defaultValue.StartsWith('(') -and $defaultValue.EndsWith(')')) {
             $defaultValue = $defaultValue.Substring(1, $defaultValue.Length - 2).Trim()
         }
@@ -374,31 +370,34 @@ function Assert-RagsFileStructure {
         return $defaultValue
     }
 
-    # Determines whether an OLE DB schema column row is an auto-increment
-    # (identity) column. SQL Server Compact reports the next identity value
-    # in the AUTOINC_NEXT schema column for identity columns and reports
-    # DBNull for all other columns.
+    # Determines whether a schema column row is an auto-increment (identity)
+    # column. SQL Server Compact reports the next identity value in the
+    # AUTOINC_NEXT INFORMATION_SCHEMA column for identity columns and reports
+    # NULL for all other columns.
     function Test-RagsSchemaAutoIncrement {
         param(
             [Parameter(Mandatory = $true)]
-            [System.Data.DataRow]$Column
+            [hashtable]$Column
         )
 
-        $nextAutoIncrementValue = $Column.AUTOINC_NEXT
+        $nextAutoIncrementValue = $Column['AUTOINC_NEXT']
         return (($null -ne $nextAutoIncrementValue) -and ($nextAutoIncrementValue -isnot [System.DBNull]))
     }
 
-    # Read the table metadata of the connected database. Only tables of the
-    # TABLE type are considered; system tables and views are excluded.
+    # Read the table metadata of the connected database from the SQL Server
+    # Compact INFORMATION_SCHEMA views. Only tables of the TABLE type are
+    # considered; system tables are excluded.
     Write-Verbose "Reading the table metadata of the RAGS file connected through '$($RagsConnection.DataSource)'."
     $tableRows = @(
-        $RagsConnection.GetOleDbSchemaTable([System.Data.OleDb.OleDbSchemaGuid]::Tables, $null).Rows |
-            Where-Object { $_.TABLE_TYPE -eq 'TABLE' }
+        Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT * FROM [INFORMATION_SCHEMA].[TABLES]' |
+            Where-Object { $_['TABLE_TYPE'] -eq 'TABLE' }
     )
 
     # Read the column metadata of the connected database in a single query.
     Write-Verbose 'Reading the column metadata of the connected database.'
-    $columnRows = @($RagsConnection.GetOleDbSchemaTable([System.Data.OleDb.OleDbSchemaGuid]::Columns, $null).Rows)
+    $columnRows = @(
+        Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT * FROM [INFORMATION_SCHEMA].[COLUMNS]'
+    )
 
     # Index the actual tables and index the actual columns by table name and
     # column name. All lookups are performed through hashtables, which are
@@ -407,18 +406,18 @@ function Assert-RagsFileStructure {
     $actualTableNames = @{}
     $actualColumnsByTable = @{}
     foreach ($tableRow in $tableRows) {
-        $tableName = [string]$tableRow.TABLE_NAME
+        $tableName = [string]$tableRow['TABLE_NAME']
         $actualTableNames[$tableName] = $true
         $actualColumnsByTable[$tableName] = @{}
     }
     foreach ($columnRow in $columnRows) {
-        $tableName = [string]$columnRow.TABLE_NAME
+        $tableName = [string]$columnRow['TABLE_NAME']
         if (-not $actualColumnsByTable.ContainsKey($tableName)) {
             # Columns of tables which are not user tables in the table
-            # metadata above (system tables and views) are irrelevant.
+            # metadata above (system tables) are irrelevant.
             continue
         }
-        $actualColumnsByTable[$tableName][[string]$columnRow.COLUMN_NAME] = $columnRow
+        $actualColumnsByTable[$tableName][[string]$columnRow['COLUMN_NAME']] = $columnRow
     }
 
     # Case-insensitive lookup of the expected table names, used to detect
@@ -505,8 +504,10 @@ function Assert-RagsFileStructure {
                 }
             }
 
-            # Nullability.
-            $actualNullable = [bool]$actualColumn.IS_NULLABLE
+            # Nullability. The INFORMATION_SCHEMA view reports nullability as
+            # the strings 'YES' and 'NO' (a [bool] cast of any non-empty
+            # string would be $true, so the string is compared directly).
+            $actualNullable = ('YES' -eq [string]$actualColumn['IS_NULLABLE'])
             if ($actualNullable -ne $expectedNullable) {
                 $expectedNullableText = if ($expectedNullable) { 'nullable' } else { 'not nullable' }
                 $actualNullableText = if ($actualNullable) { 'nullable' } else { 'not nullable' }

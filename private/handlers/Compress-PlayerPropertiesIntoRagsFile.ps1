@@ -13,7 +13,7 @@ function Compress-PlayerPropertiesIntoRagsFile {
     Path of the folder to compress the PlayerProperties data from.
 
     .PARAMETER RagsConnection
-    An open OLE DB connection to the RAGS file (provider Microsoft.SQLSERVER.CE.OLEDB.3.5),
+    An open SQL Server Compact connection to the RAGS file,
     as returned by Open-RagsFileConnection.
 
     .EXAMPLE
@@ -25,7 +25,7 @@ function Compress-PlayerPropertiesIntoRagsFile {
         [string]$SourcePath,
 
         [Parameter(Mandatory = $true)]
-        [System.Data.OleDb.OleDbConnection]$RagsConnection
+        [System.Data.SqlServerCe.SqlCeConnection]$RagsConnection
     )
 
     Write-Host 'TODO: Implement Compress-PlayerPropertiesIntoRagsFile.'
