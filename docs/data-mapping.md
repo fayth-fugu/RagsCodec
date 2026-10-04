@@ -13,17 +13,13 @@
 ## Special handling instructions
 
 - Columns tagged with the `Exclude` handling instruction are **excluded from expansion** and ignored during compression
-- Columns tagged with the `List` handling instruction will group rows containing the same value and serve as the key for a **YAML sequence or mapping** (for *single-file expansions*) or as the **filename** (for *subfolder expansions*)
-  - If the table has only **one** other non-`Exclude` column (in addition to the `List` column), a *YAML sequence* is generated
-  - If the table has **more than one** other non-`Exclude` column (in addition to the `List` column), a *YAML mapping* is generated
-    - A `Unique` column needs to exist to serve as the key
+- Columns tagged with the `List` handling instruction will group rows containing the same value and serve as the main entry for a **YAML sequence** (for *single-file expansions*) or as the **filename** (for *subfolder expansions*)
   - **Maximum one** `List` **column per table**
 - Columns tagged with the `Unique` handling instruction are expected to **contain only distinct values**
   - This is *soft-validated* during expansion — a warning is shown if duplicate values are detected
     - Tables are sorted before expansion and only the *first duplicate entry* is read
       - Refer to individual tables below for sorting conditions
-    - An optional parameter is available to throw an error and abort expansion if duplicates are present
-  - If there are `List` and/or other `Unique` columns present, the columns are grouped together for distinctiveness checks
+  - **Maximum one** `Unique` **column per table**
 - Columns tagged with the `Xml` handling instruction may contain XML data (with no XML declaration)
   - Data in these columns are *pretty-printed* during expansion, then *linearized* during compression
   - If pretty-printing/linearizing fails, then the *raw value* is read/written
@@ -34,12 +30,12 @@
 
 - *Base64-encoded binary stream* with the following structure:
   - **4 bytes of padding** at stream start
-    - These 4 bytes store the size of the subsequent GZip stream
-    - This information is unnecessary and can be safely **discarded** during expansion
-      - **Note:** RAGS Designer requires this information for its internal GZip decompression — the default value of `16 MiB` can be optionally increased to allow for massively complex RAGS Actions
-    - When compressing, the padding value is set to a *default static value* (`FF FF FF 00` — `16777215` in little-endian unsigned int, sufficient for a `16 MiB` GZip stream)
-      - An optional parameter is available to set a *custom padding value* (maximum value limited to `FF FF FF 7F` — `2147483647` in little-endian unsigned int, indicating a `2 GiB` GZip stream)
-      - *Lowering* the padding value below the default is *not supported*
+    - These 4 bytes store the *decompressed size* of the subsequent **GZip stream**
+      - The value is stored in **little-endian unsigned int**, e.g. `FF FF FF 00` for `16777215` bytes
+      - This info is *discarded* during expansion
+    - **RAGS Designer requires** this info for its internal GZip decompression
+      - The value is detected from the **input XML size** during *recompression*
+      - An additional `1 MiB` (`1048576` bytes) will be added to the detected size, to serve as a buffer
   - All *subsequent bytes* after the padding represent a **standard GZip stream** containing an **XML** snippet (with no XML declaration)
     - The GZip stream may be compressed with *any compression level*, but **Default** compression levels are recommended when compressing
   - The XML snippet is usually *stored linearized* and is *pretty-printed during expansion*
@@ -76,7 +72,7 @@
 
 - `CharacterActions`
   - Expanded into a subfolder — `CharacterActions/`
-  - `List`-column handling: A YAML file is created for each distinct `Charname` value with the naming convention `{GUID}.yaml` (in lowercase)
+  - `List`-column handling: A YAML file is created for each distinct `Charname` value with the naming convention `{GUID}.yaml`
     - The `GUID` value is converted from `Charname` as described above
   - Table is sorted first by `Charname` ascending, then by `ID` ascending
   - `RagsAction`-column handling: All `Data` rows for each `Charname` are extracted using `RagsAction` expansion

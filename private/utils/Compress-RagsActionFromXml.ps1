@@ -17,14 +17,11 @@ function Compress-RagsActionFromXml {
     The encoded value is a Base64-encoded binary stream with the following
     structure:
 
-    - 4 bytes of padding at the start of the stream, storing the size of the
-    subsequent GZip stream. RAGS Designer requires this information for its
-    internal GZip decompression, so a static value is written by default
-    ('FF FF FF 00' - 16777215 in little-endian unsigned int, sufficient for a
-    16 MiB GZip stream). A larger value may be supplied for massively complex
-    RAGS actions, up to 'FF FF FF 7F' (2147483647 in little-endian unsigned
-    int, sufficient for a 2 GiB GZip stream); lowering the padding value below
-    the default is not supported.
+    - 4 bytes of padding at the start of the stream, storing the decompressed
+    size of the subsequent GZip stream as a little-endian unsigned int. RAGS
+    Designer requires this information for its internal GZip decompression,
+    and the value is determined by the input XML size, with an additional
+    1 MiB (1048576 bytes) added as buffer.
     - All subsequent bytes represent a standard GZip stream containing the
     XML snippet. The snippet is usually stored linearized, and is linearized
     here before compression; the stream is compressed with the default
@@ -40,14 +37,6 @@ function Compress-RagsActionFromXml {
     is verified to be a well-formed XML snippet before it is encoded; an XML
     declaration is optional.
 
-    .PARAMETER CustomPaddingSize
-    Optional value written to the 4-byte padding at the start of the stream.
-    The value defaults to 16777215 ('FF FF FF 00' in little-endian unsigned
-    int, sufficient for a 16 MiB GZip stream) and must be at least that;
-    lowering the padding value below the default is not supported. The value
-    must not exceed 2147483647 ('FF FF FF 7F' in little-endian unsigned int,
-    sufficient for a 2 GiB GZip stream).
-
     .OUTPUTS
     System.String. The Base64-encoded RAGS action.
 
@@ -55,35 +44,16 @@ function Compress-RagsActionFromXml {
     PS> $encodedAction = Compress-RagsActionFromXml -XmlRagsAction $actionXml
 
     Compresses the XML snippet in $actionXml into its Base64-encoded RAGS
-    action form, using the default padding value.
-
-    .EXAMPLE
-    PS> $encodedAction = Compress-RagsActionFromXml -XmlRagsAction $actionXml -CustomPaddingSize 536870912
-
-    Compresses the XML snippet using a custom padding value advertising a
-    capacity for a 512 MiB GZip stream.
+    action form, determining the 4-byte padding from the input XML size plus
+    a 1 MiB buffer.
     #>
     [CmdletBinding()]
     [OutputType([System.String])]
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$XmlRagsAction,
-
-        [Parameter()]
-        [uint32]$CustomPaddingSize = 16777215
+        [string]$XmlRagsAction
     )
-
-    $minimumPaddingSize = 16777215
-    $maximumPaddingSize = 2147483647
-
-    if ($CustomPaddingSize -lt $minimumPaddingSize) {
-        throw "Cannot compress the RAGS action: the custom padding size $CustomPaddingSize is lower than the default value of $minimumPaddingSize; lowering the padding value below the default is not supported."
-    }
-
-    if ($CustomPaddingSize -gt $maximumPaddingSize) {
-        throw "Cannot compress the RAGS action: the custom padding size $CustomPaddingSize exceeds the maximum supported value of $maximumPaddingSize."
-    }
 
     # Trim surrounding whitespace so that values carried over from pretty-
     # printed YAML files still parse.
@@ -189,20 +159,24 @@ function Compress-RagsActionFromXml {
         throw 'Cannot compress the RAGS action: the GZip stream was empty.'
     }
 
-    # RAGS Designer requires the advertised capacity to cover the GZip stream;
-    # the default padding is sufficient for all but massively complex actions.
-    if ($gzipBytes.Length -gt $CustomPaddingSize) {
-        Write-Warning "The GZip stream of the compressed RAGS action is $($gzipBytes.Length) byte(s) long, which exceeds the $($CustomPaddingSize) byte(s) advertised by the padding value; consider increasing -CustomPaddingSize for massively complex RAGS actions."
+    # The padding advertises the decompressed size of the GZip stream for
+    # RAGS Designer's internal decompression. Following the RAGS Action format
+    # specification, the value is determined by the input XML size with an
+    # additional 1 MiB (1048576 bytes) added as buffer.
+    $paddingBufferBytes = 1048576
+    $paddedSize = [uint64]$xmlBytes.Length + $paddingBufferBytes
+    if ($paddedSize -gt [uint32]::MaxValue) {
+        throw "Cannot compress the RAGS action: the input XML size of $($xmlBytes.Length) byte(s) plus the 1 MiB padding buffer exceeds the largest value representable by the 4-byte padding (4294967295)."
     }
 
     # Assemble the padded stream: 4 bytes of little-endian padding followed by
     # the GZip stream, then Base64-encode the whole stream.
-    $paddingBytes = [System.BitConverter]::GetBytes([uint32]$CustomPaddingSize)
+    $paddingBytes = [System.BitConverter]::GetBytes([uint32]$paddedSize)
     $ragsActionBytes = [byte[]]::new(4 + $gzipBytes.Length)
     [Array]::Copy($paddingBytes, 0, $ragsActionBytes, 0, 4)
     [Array]::Copy($gzipBytes, 0, $ragsActionBytes, 4, $gzipBytes.Length)
 
-    Write-Verbose ("Compressed the RAGS action into a {0}-byte stream (4 padding bytes + {1} GZip byte(s)) with a padding value of {2} (0x{2:X8})." -f $ragsActionBytes.Length, $gzipBytes.Length, $CustomPaddingSize)
+    Write-Verbose ("Compressed the RAGS action into a {0}-byte stream (4 padding bytes + {1} GZip byte(s)) with a padding value of {2} ({3} byte(s) of XML plus a 1 MiB buffer)." -f $ragsActionBytes.Length, $gzipBytes.Length, $paddedSize, $xmlBytes.Length)
 
     return [System.Convert]::ToBase64String($ragsActionBytes)
 }
