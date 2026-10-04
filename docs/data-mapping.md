@@ -89,7 +89,39 @@
     ```
 - `CharacterProperties`
   - Expanded into a single file — `CharacterProperties.yaml`
-  - TODO
+  - `List`-column handling: Each distinct `Charname` value starts a new entry in the top-level YAML sequence
+  - Table is sorted first by `Charname` ascending, then by `Name` ascending, then by `ID` ascending
+  - `Unique`-column handling: If multiple identical `Name`s exist for the same `Charname` value, then only the `Value` of the first row will be read
+    - First-row ordering will be determined by the sorting rules of the table
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+  - Sample structure of a `CharacterProperties.yaml` file:
+    ```yaml
+    CharacterProperties:
+      - Charname: {Charname}
+        Name:
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+      - Charname: {Charname}
+        Name:
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+      - Charname: {Charname}
+        Name:
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+    ```
 - `Characters`
   - Expanded into a single file — `Characters.yaml`
   - TODO
