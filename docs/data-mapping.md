@@ -70,13 +70,13 @@
   - These YAML files are named using the values from the `List` column in each table
 - `GUID` (Globally Unique Identifier) filename generation logic:
   - `CharacterActions`, `Media` and `TimerActions` tables with `List` columns will have their column names converted to a `GUID` before being used as a filename
-  - The column is MD5-hashed, then the result used to generate a `GUID`
+  - The column value is UTF-8 encoded, and the MD5 hash (a 16-byte digest) of the encoded bytes is used directly to construct a `GUID`, whose lowercase, dash-separated (`D` format) string form is used as the filename
 
 ### Individual table handling
 
 - `CharacterActions`
   - Expanded into a subfolder — `CharacterActions/`
-  - `List`-column handling: A YAML file is created for each distinct `Charname` value with the naming convention `{GUID}.yaml`
+  - `List`-column handling: A YAML file is created for each distinct `Charname` value with the naming convention `{GUID}.yaml` (in lowercase)
     - The `GUID` value is converted from `Charname` as described above
   - Table is sorted first by `Charname` ascending, then by `ID` ascending
   - `RagsAction`-column handling: All `Data` rows for each `Charname` are extracted using `RagsAction` expansion
