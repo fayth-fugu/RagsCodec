@@ -42,11 +42,14 @@ function Compress-CharacterActionsIntoRagsFile {
       be derived from it.
     - Individual entries which are null, empty or whitespace-only are
       skipped with a warning.
+    - A file which defines more than one YAML document is consumed from its
+      first document only, with a warning naming the file and the number of
+      ignored extra documents.
     - A Data value which is neither a scalar nor a sequence (for example a
-      YAML mapping), a Data entry which is not a string, a file which is
-      not a single YAML mapping document, and a non-empty Data entry whose
-      content is not well-formed XML abort the whole operation with an
-      exception, as no meaningful RAGS action can be derived from them.
+      YAML mapping), a Data entry which is not a string, a YAML document
+      which is not a mapping, and a non-empty Data entry whose content is
+      not well-formed XML abort the whole operation with an exception, as
+      no meaningful RAGS action can be derived from them.
 
     Every file of the subfolder is read, validated and encoded before the
     first row is appended, so the table remains empty when the source
@@ -155,10 +158,11 @@ function Compress-CharacterActionsIntoRagsFile {
             throw "Cannot compress the CharacterActions data of the RAGS file: the file '$($file.Name)' of the CharacterActions subfolder is empty."
         }
 
-        # Parse the file as a YAML multi-document stream, rejecting files
-        # which define more than one document (the expansion writes exactly
-        # one mapping per file, and an ambiguity about which mapping to
-        # apply cannot be resolved from the file name in general).
+        # Parse the file as a YAML multi-document stream. A file which
+        # defines more than one document is consumed from its first
+        # document only, with a warning about the extra documents (the
+        # expansion writes exactly one mapping per file, so extra documents
+        # in a source folder are usually leftovers of a manual edit).
         try {
             $parsedDocuments = @(ConvertFrom-Yaml -Yaml $fileText -AllDocuments)
         }
@@ -173,9 +177,10 @@ function Compress-CharacterActionsIntoRagsFile {
         # of multiple documents as an object array, and no value at all for
         # an empty stream. An object array is therefore always the sign of
         # a multi-document file (a single-document file can never produce
-        # one).
+        # one). Extra documents are ignored with a warning, as the first
+        # document alone determines the appended rows.
         if ($parsedDocuments.Count -gt 1) {
-            throw "Cannot compress the CharacterActions data of the RAGS file: the file '$($file.Name)' of the CharacterActions subfolder defines $($parsedDocuments.Count) YAML documents where a single mapping document is expected."
+            Write-Warning "The file '$($file.Name)' of the CharacterActions subfolder defines $($parsedDocuments.Count) YAML documents; only the first document is used and the remaining $($parsedDocuments.Count - 1) document(s) are ignored."
         }
 
         $mapping = $parsedDocuments[0]
