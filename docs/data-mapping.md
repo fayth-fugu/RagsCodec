@@ -80,12 +80,9 @@
     ```yaml
     Charname: {Charname}
     Data:
-      - |
-        {Data}
-      - |
-        {Data}
-      - |
-        {Data}
+      - {Data}
+      - {Data}
+      - {Data}
     ```
 - `CharacterProperties`
   - Expanded into a single file — `CharacterProperties.yaml`
@@ -124,7 +121,42 @@
     ```
 - `Characters`
   - Expanded into a single file — `Characters.yaml`
-  - TODO
+  - Table is sorted by `Charname` ascending
+  - `Unique`-column handling: If multiple identical `Charname`s exist, then only the first row's column values will be read
+    - First-row ordering will be determined by the sorting rules of the table
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+    - RAGS Designer **does not support** characters whose names differ only in *capitalization* — this particular unique check is case-insensitive
+  - Sample structure of a `Characters.yaml` file:
+    ```yaml
+    Characters:
+      - Charname: {Charname}
+        CharnameOverride: {CharnameOverride}
+        CharGender: {CharGender}
+        CurrentRoom: {CurrentRoom}
+        Description: {Description}
+        AllowInventoryInteraction: {AllowInventoryInteraction}
+        EnterFirstTime: {EnterFirstTime}
+        LeaveFirstTime: {LeaveFirstTime}
+        CharPortrait: {CharPortrait}
+      - Charname: {Charname}
+        CharnameOverride: {CharnameOverride}
+        CharGender: {CharGender}
+        CurrentRoom: {CurrentRoom}
+        Description: {Description}
+        AllowInventoryInteraction: {AllowInventoryInteraction}
+        EnterFirstTime: {EnterFirstTime}
+        LeaveFirstTime: {LeaveFirstTime}
+        CharPortrait: {CharPortrait}
+      - Charname: {Charname}
+        CharnameOverride: {CharnameOverride}
+        CharGender: {CharGender}
+        CurrentRoom: {CurrentRoom}
+        Description: {Description}
+        AllowInventoryInteraction: {AllowInventoryInteraction}
+        EnterFirstTime: {EnterFirstTime}
+        LeaveFirstTime: {LeaveFirstTime}
+        CharPortrait: {CharPortrait}
+    ```
 - `GameData`
   - Expanded into a single file — `GameData.yaml`
   - TODO
