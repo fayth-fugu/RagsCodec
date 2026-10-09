@@ -23,7 +23,7 @@
 - Columns tagged with the `Xml` handling instruction may contain XML data (with no XML declaration)
   - Data in these columns are *pretty-printed* during expansion, then *linearized* during compression
   - If pretty-printing/linearizing fails, then the *raw value* is read/written
-- Columns tagged with the `RagsAction` handling instruction contain encoded data which needs a custom compressor/expander
+- Columns tagged with the `RagsAction` handling instruction contain encoded data that needs a custom compressor/expander
   - Refer to the [format specification](#rags-action-format-specification) below
 
 ## RAGS Action format specification
@@ -37,7 +37,7 @@
       - The value is detected from the **input XML size** during *recompression*
       - An additional `1 MiB` (`1048576` bytes) will be added to the detected size, to serve as a buffer
   - All *subsequent bytes* after the padding represent a **standard GZip stream** containing an **XML** snippet (with no XML declaration)
-    - The GZip stream may be compressed with *any compression level*, but **Default** compression levels are recommended when compressing
+    - The GZip stream may be compressed with *any compression level*, but **Default** compression level is recommended when compressing
   - The XML snippet is usually *stored linearized* and is *pretty-printed during expansion*
 
 ## YAML compression/expansion rules
@@ -49,23 +49,23 @@
   - `ntext` => `!!str`
     - `ntext` fields contain *multi-line free text or XML*
   - `bit` => `!!bool`
-    - `0` and null values are mapped to `false`, while `1` is mapped to `true`
+    - `0` and `null` values are mapped to `false`, while `1` is mapped to `true`
   - `float` => `!!float`
   - `image` => `!!binary`
     - The binary stream is *Base64-encoded* during expansion
   - `datetime` => `!!timestamp`
-    - `datetime` values are extracted as `ISO 8601 strings`
+    - `datetime` values are extracted as *ISO 8601 strings*
   - `null` values for any data type (except `bit`) => `!!null`
 
 ## Table compression/expansion conventions
 
 ### Notes
 
-- `{COLUMNNAME}` placeholders in YAML samples below are replaced with the actual column values during expansion
+- `{ColumnName}` placeholders in YAML samples below are replaced with the actual column values during expansion
 - `RagsAction`-containing tables (except for `PlayerActions`) are expanded into individual subfolders containing multiple YAML files
   - These YAML files are named using the values from the `List` column in each table
 - `GUID` (Globally Unique Identifier) filename generation logic:
-  - `CharacterActions`, `Media` and `TimerActions` tables with `List` columns will have their column names converted to a `GUID` before being used as a filename
+  - `CharacterActions`, `Media`, and `TimerActions` tables with `List` columns will have their column values converted to a `GUID` before being used as a filename
   - The column value is UTF-8 encoded, and the MD5 hash (a 16-byte digest) of the encoded bytes is used directly to construct a `GUID`, whose lowercase, dash-separated (`D` format) string form is used as the filename
 
 ### Individual table handling
@@ -73,7 +73,7 @@
 - `CharacterActions`
   - Expanded into a subfolder — `CharacterActions/`
   - `List`-column handling: A YAML file is created for each distinct `Charname` value with the naming convention `{GUID}.yaml`
-    - The `GUID` value is converted from `Charname` as described above
+    - The `GUID` value is derived from `Charname` as described above
   - Table is sorted first by `Charname` ascending, then by `ID` ascending
   - `RagsAction`-column handling: All `Data` rows for each `Charname` are extracted using `RagsAction` expansion
   - Sample structure of each `{GUID}.yaml` file:
@@ -159,7 +159,30 @@
     ```
 - `GameData`
   - Expanded into a single file — `GameData.yaml`
-  - TODO
+  - This table should only have **a single row** — if multiple rows exist, only the first row's column values will be read
+  - Sample structure of a `GameData.yaml` file:
+    ```yaml
+    Title: {Title}
+    OpeningMessage: {OpeningMessage}
+    HideMainPicDisplay: {HideMainPicDisplay}
+    UseInlineImages: {UseInlineImages}
+    HidePortrait: {HidePortrait}
+    AuthorName: {AuthorName}
+    GameVersion: {GameVersion}
+    GameInformation: {GameInformation}
+    bgMusic: {bgMusic}
+    RepeatbgMusic: {RepeatbgMusic}
+    PasswordProtected: {PasswordProtected}
+    GamePassword: {GamePassword}
+    ObjectVersionNumber: {ObjectVersionNumber}
+    GameFont: {GameFont}
+    RoomGroups: {RoomGroups}
+    ClothingZoneLevels: {ClothingZoneLevels}
+    NotificationsOff: {NotificationsOff}
+    SortOrderRoom: {SortOrderRoom}
+    SortOrderCharacters: {SortOrderCharacters}
+    SortOrderInventory: {SortOrderInventory}
+    ```
 - `ItemActions`
   - Expanded into a subfolder — `ItemActions/`
   - TODO

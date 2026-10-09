@@ -18,7 +18,7 @@ function ConvertTo-RagsFilenameGuid {
     returned, to be used as the base file name (before the '.yaml' extension).
 
     The same algorithm must be used when re-compressing a subfolder back into
-    a RAGS file file (Compress-* handlers), although those handlers consume
+    a RAGS file (Compress-* handlers), although those handlers consume
     the file contents and merely accept any well-formed file names.
 
     .PARAMETER Value
