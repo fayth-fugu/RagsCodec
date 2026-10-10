@@ -125,7 +125,7 @@
   - `Unique`-column handling: If multiple identical `Charname`s exist, then only the first row's column values will be read
     - First-row ordering will be determined by the sorting rules of the table
     - A warning containing the values of subsequent ignored duplicate rows will be shown
-    - RAGS Designer **does not support** characters whose names differ only in *capitalization* — this particular unique check is case-insensitive
+    - RAGS Designer **does not support** `Charname`s which differ only in *capitalization* — this particular unique check is case-insensitive
   - Sample structure of a `Characters.yaml` file:
     ```yaml
     Characters:
@@ -198,7 +198,21 @@
     ```
 - `ItemGroups`
   - Expanded into a single file — `ItemGroups.yaml`
-  - TODO
+  - Table is sorted first by `Name` ascending, then by `ID` ascending
+  - `Unique`-column handling: If multiple identical `Name`s exist, then only the `Parent` of the first row will be read
+    - First-row ordering will be determined by the sorting rules of the table
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+    - RAGS Designer **does not support** `ItemGroups` which differ only in *capitalization* — this particular unique check is case-insensitive
+  - Sample structure of an `ItemGroups.yaml` file:
+    ```yaml
+    ItemGroups:
+      - Name: {Name}
+        Parent: {Parent}
+      - Name: {Name}
+        Parent: {Parent}
+      - Name: {Name}
+        Parent: {Parent}
+    ```
 - `ItemLayeredZoneLevels`
   - Expanded into a single file — `ItemLayeredZoneLevels.yaml`
   - TODO
