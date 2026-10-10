@@ -215,7 +215,27 @@
     ```
 - `ItemLayeredZoneLevels`
   - Expanded into a single file — `ItemLayeredZoneLevels.yaml`
-  - TODO
+  - `List`-column handling: Each distinct `ItemID` value starts a new entry in the top-level YAML sequence
+  - Table is sorted first by `ItemID` ascending, then by `ID` ascending
+  - Sample structure of an `ItemLayeredZoneLevels.yaml` file:
+    ```yaml
+    ItemLayeredZoneLevels:
+      - ItemID: {ItemID}
+        Data:
+          - {Data}
+          - {Data}
+          - {Data}
+      - ItemID: {ItemID}
+        Data:
+          - {Data}
+          - {Data}
+          - {Data}
+      - ItemID: {ItemID}
+        Data:
+          - {Data}
+          - {Data}
+          - {Data}
+    ```
 - `ItemProperties`
   - Expanded into a single file — `ItemProperties.yaml`
   - TODO
