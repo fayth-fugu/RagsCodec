@@ -185,7 +185,17 @@
     ```
 - `ItemActions`
   - Expanded into a subfolder — `ItemActions/`
-  - TODO
+  - `List`-column handling: A YAML file is created for each distinct `ItemID` value with the naming convention `{ItemID}.yaml`
+  - Table is sorted first by `ItemID` ascending, then by `ID` ascending
+  - `RagsAction`-column handling: All `Data` rows for each `ItemID` are extracted using `RagsAction` expansion
+  - Sample structure of each `{ItemID}.yaml` file:
+    ```yaml
+    ItemID: {ItemID}
+    Data:
+      - {Data}
+      - {Data}
+      - {Data}
+    ```
 - `ItemGroups`
   - Expanded into a single file — `ItemGroups.yaml`
   - TODO
