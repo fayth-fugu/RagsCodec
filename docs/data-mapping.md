@@ -238,7 +238,39 @@
     ```
 - `ItemProperties`
   - Expanded into a single file — `ItemProperties.yaml`
-  - TODO
+  - `List`-column handling: Each distinct `ItemID` value starts a new entry in the top-level YAML sequence
+  - Table is sorted first by `ItemID` ascending, then by `Name` ascending, then by `ID` ascending
+  - `Unique`-column handling: If multiple identical `Name`s exist for the same `ItemID` value, then only the `Value` of the first row will be read
+    - First-row ordering will be determined by the sorting rules of the table
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+  - Sample structure of an `ItemProperties.yaml` file:
+    ```yaml
+    ItemProperties:
+      - ItemID: {ItemID}
+        Name:
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+      - ItemID: {ItemID}
+        Name:
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+      - ItemID: {ItemID}
+        Name:
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+    ```
 - `Items`
   - Expanded into a single file — `Items.yaml`
   - TODO
