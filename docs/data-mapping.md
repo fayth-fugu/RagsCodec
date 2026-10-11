@@ -74,6 +74,7 @@
   - Expanded into a subfolder — `CharacterActions/`
   - `List`-column handling: A YAML file is created for each distinct `Charname` value with the naming convention `{GUID}.yaml`
     - The `GUID` value is derived from `Charname` as described above
+    - Values are *case-sensitive*
   - Table is sorted first by `Charname` ascending, then by `ID` ascending
   - `RagsAction`-column handling: All `Data` rows for each `Charname` are extracted using `RagsAction` expansion
   - Sample structure of each `{GUID}.yaml` file:
@@ -87,10 +88,11 @@
 - `CharacterProperties`
   - Expanded into a single file — `CharacterProperties.yaml`
   - `List`-column handling: Each distinct `Charname` value starts a new entry in the top-level YAML sequence
+    - Values are *case-sensitive*
   - Table is sorted first by `Charname` ascending, then by `Name` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist for the same `Charname` value, then only the `Value` of the first row will be read
-    - First-row ordering will be determined by the sorting rules of the table
     - A warning containing the values of subsequent ignored duplicate rows will be shown
+    - Values are *case-sensitive*
   - Sample structure of a `CharacterProperties.yaml` file:
     ```yaml
     CharacterProperties:
@@ -123,9 +125,9 @@
   - Expanded into a single file — `Characters.yaml`
   - Table is sorted by `Charname` ascending
   - `Unique`-column handling: If multiple identical `Charname`s exist, then only the first row's column values will be read
-    - First-row ordering will be determined by the sorting rules of the table
     - A warning containing the values of subsequent ignored duplicate rows will be shown
-    - RAGS Designer **does not support** `Charname`s which differ only in *capitalization* — this particular unique check is case-insensitive
+    - Values are **case-insensitive**
+      - Only the first detected casing will be read
   - Sample structure of a `Characters.yaml` file:
     ```yaml
     Characters:
@@ -160,6 +162,7 @@
 - `GameData`
   - Expanded into a single file — `GameData.yaml`
   - This table should only have **a single row** — if multiple rows exist, only the first row's column values will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
   - Sample structure of a `GameData.yaml` file:
     ```yaml
     Title: {Title}
@@ -186,6 +189,8 @@
 - `ItemActions`
   - Expanded into a subfolder — `ItemActions/`
   - `List`-column handling: A YAML file is created for each distinct `ItemID` value with the naming convention `{ItemID}.yaml`
+    - Values are **case-insensitive**
+      - Always coerced to lowercase
   - Table is sorted first by `ItemID` ascending, then by `ID` ascending
   - `RagsAction`-column handling: All `Data` rows for each `ItemID` are extracted using `RagsAction` expansion
   - Sample structure of each `{ItemID}.yaml` file:
@@ -200,9 +205,9 @@
   - Expanded into a single file — `ItemGroups.yaml`
   - Table is sorted first by `Name` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist, then only the `Parent` of the first row will be read
-    - First-row ordering will be determined by the sorting rules of the table
     - A warning containing the values of subsequent ignored duplicate rows will be shown
-    - RAGS Designer **does not support** `ItemGroups` which differ only in *capitalization* — this particular unique check is case-insensitive
+    - Values are **case-insensitive**
+      - Only the first detected casing will be read
   - Sample structure of an `ItemGroups.yaml` file:
     ```yaml
     ItemGroups:
@@ -216,6 +221,8 @@
 - `ItemLayeredZoneLevels`
   - Expanded into a single file — `ItemLayeredZoneLevels.yaml`
   - `List`-column handling: Each distinct `ItemID` value starts a new entry in the top-level YAML sequence
+    - Values are **case-insensitive**
+      - Always coerced to lowercase
   - Table is sorted first by `ItemID` ascending, then by `ID` ascending
   - Sample structure of an `ItemLayeredZoneLevels.yaml` file:
     ```yaml
@@ -239,10 +246,12 @@
 - `ItemProperties`
   - Expanded into a single file — `ItemProperties.yaml`
   - `List`-column handling: Each distinct `ItemID` value starts a new entry in the top-level YAML sequence
+    - Values are **case-insensitive**
+      - Always coerced to lowercase
   - Table is sorted first by `ItemID` ascending, then by `Name` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist for the same `ItemID` value, then only the `Value` of the first row will be read
-    - First-row ordering will be determined by the sorting rules of the table
     - A warning containing the values of subsequent ignored duplicate rows will be shown
+    - Values are *case-sensitive*
   - Sample structure of an `ItemProperties.yaml` file:
     ```yaml
     ItemProperties:
@@ -273,7 +282,90 @@
     ```
 - `Items`
   - Expanded into a single file — `Items.yaml`
-  - TODO
+  - Table is sorted by `UniqueID` ascending
+  - `Unique`-column handling: If multiple identical `UniqueID`s exist, then only the first row's column values will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+    - Values are **case-insensitive**
+      - Always coerced to lowercase
+  - Sample structure of an `Items.yaml` file:
+    ```yaml
+    Items:
+      - UniqueID: {UniqueID}
+        Name: {Name}
+        Description: {Description}
+        SDesc: {SDesc}
+        Preposition: {Preposition}
+        LocationName: {LocationName}
+        LocationType: {LocationType}
+        Carryable: {Carryable}
+        Wearable: {Wearable}
+        Openable: {Openable}
+        Lockable: {Lockable}
+        Enterable: {Enterable}
+        Readable: {Readable}
+        Container: {Container}
+        Weight: {Weight}
+        Worn: {Worn}
+        Read: {Read}
+        Locked: {Locked}
+        Open: {Open}
+        Entered: {Entered}
+        Visible: {Visible}
+        EnterFirstTime: {EnterFirstTime}
+        LeaveFirstTime: {LeaveFirstTime}
+        GroupName: {GroupName}
+        Important: {Important}
+      - UniqueID: {UniqueID}
+        Name: {Name}
+        Description: {Description}
+        SDesc: {SDesc}
+        Preposition: {Preposition}
+        LocationName: {LocationName}
+        LocationType: {LocationType}
+        Carryable: {Carryable}
+        Wearable: {Wearable}
+        Openable: {Openable}
+        Lockable: {Lockable}
+        Enterable: {Enterable}
+        Readable: {Readable}
+        Container: {Container}
+        Weight: {Weight}
+        Worn: {Worn}
+        Read: {Read}
+        Locked: {Locked}
+        Open: {Open}
+        Entered: {Entered}
+        Visible: {Visible}
+        EnterFirstTime: {EnterFirstTime}
+        LeaveFirstTime: {LeaveFirstTime}
+        GroupName: {GroupName}
+        Important: {Important}
+      - UniqueID: {UniqueID}
+        Name: {Name}
+        Description: {Description}
+        SDesc: {SDesc}
+        Preposition: {Preposition}
+        LocationName: {LocationName}
+        LocationType: {LocationType}
+        Carryable: {Carryable}
+        Wearable: {Wearable}
+        Openable: {Openable}
+        Lockable: {Lockable}
+        Enterable: {Enterable}
+        Readable: {Readable}
+        Container: {Container}
+        Weight: {Weight}
+        Worn: {Worn}
+        Read: {Read}
+        Locked: {Locked}
+        Open: {Open}
+        Entered: {Entered}
+        Visible: {Visible}
+        EnterFirstTime: {EnterFirstTime}
+        LeaveFirstTime: {LeaveFirstTime}
+        GroupName: {GroupName}
+        Important: {Important}
+    ```
 - `Media`
   - Expanded into a subfolder — `Media/`
   - TODO
