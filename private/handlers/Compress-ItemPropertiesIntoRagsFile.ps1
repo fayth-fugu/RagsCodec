@@ -41,10 +41,12 @@ function Compress-ItemPropertiesIntoRagsFile {
       contributes no rows without a warning. An ItemProperties value
       which is a scalar or a single mapping (as hand-edited files
       omitting the trailing sequence dash commonly are) is accepted as
-      the single entry of the sequence with a warning (for a scalar
-      entry this aborts the operation in the entry validation below); a
-      value of any other type aborts the whole operation with an
-      exception.
+      the single entry of the sequence with a warning; a scalar which is
+      not a string is additionally coerced to its invariant string form
+      with a second warning, and a scalar entry then aborts the
+      operation in the entry validation below (an entry has to be a
+      mapping). A value of any other type aborts the whole operation
+      with an exception.
     - Entries which are null are skipped with a warning. An entry which
       is not a mapping aborts the whole operation with an exception, as
       no meaningful item can be derived from it. Keys of an entry other
@@ -60,26 +62,28 @@ function Compress-ItemPropertiesIntoRagsFile {
       or a mapping aborts the whole operation with an exception, as no
       meaningful scalar can be derived from it.
     - An ItemID value longer than the 250 characters of the table column
-      is truncated with a warning (which fires only when the entry
-      contributes rows); note that re-expanding the appended data then
-      derives a different item from the truncated value. Because a
-      longer value could not be stored, the truncation happens before
-      the case-insensitive item grouping below, so two ItemID values
-      which become equal only by their truncation group together like
-      any other set of case mates.
+      is truncated with a warning, which fires as soon as the value is
+      accepted (before the Name value of the entry is validated); note
+      that re-expanding the appended data then derives a different item
+      from the truncated value. Because a longer value could not be
+      stored, the truncation happens before the lowercasing and
+      case-insensitive item grouping below, so two ItemID values which
+      become equal only by their truncation group together like any
+      other set of case mates.
     - Entries whose ItemID values differ only in character case form one
-      item: the item identity of the properties is case-insensitive,
-      matching the collation of the underlying database and the
-      case-insensitive grouping of the expansion (with which the grouped
-      items re-expand into one entry). Every such entry is merged under
-      the casing read first, with one warning per merged entry which
-      fires only when the entry contributes rows; its rows carry the
-      first-read casing, so the appended data re-expands into one entry
-      silently.
-    - An entry which repeats the exact ItemID value of a previously read
-      entry is warned about; the properties of both entries are appended
-      under the same item, as one item cannot carry two property sets in
-      the table.
+      item: the item identity of the properties is treated
+      case-insensitively ('Values are case-insensitive',
+      docs/data-mapping.md, ItemProperties section) and every ItemID
+      value is coerced to lowercase ('Always coerced to lowercase',
+      docs/data-mapping.md, ItemProperties section): after the
+      truncation above, the value is lowercased with ToLowerInvariant,
+      so the appended rows carry the lowercased form and re-expand into
+      the same lowercased item. Case mates group under the lowercased
+      value read first; an entry whose raw ItemID value differs from the
+      first-read raw value of its group only in character case is merged
+      into it with one warning. Entries whose ItemID values are exactly
+      equal are appended without a warning, as append-only accumulation
+      is the documented caller workflow.
     - An entry whose Name value is missing, null, empty, whitespace-only
       or an empty sequence is skipped in its entirety with a warning, as
       no property can be derived from it. A Name value which is a scalar
@@ -261,7 +265,10 @@ function Compress-ItemPropertiesIntoRagsFile {
     # missing or empty envelope contributes no rows. A scalar or
     # single-mapping envelope is accepted as the single entry of the
     # sequence with a warning, as hand-edited files commonly omit the
-    # trailing sequence dash.
+    # trailing sequence dash; a non-string scalar is coerced to its
+    # invariant string form with a second warning, so the coerced entry
+    # is rejected by the entry validation below (an entry has to be a
+    # mapping).
     $entriesValue = [System.Collections.Generic.List[object]]::new()
     $envelopeValue = $rootDocument['ItemProperties']
     if ($null -eq $envelopeValue) {
@@ -288,7 +295,17 @@ function Compress-ItemPropertiesIntoRagsFile {
         $entriesValue = $coercedEntries
     }
     else {
-        throw "Cannot compress the ItemProperties data of the RAGS file: the ItemProperties value of the file 'ItemProperties.yaml' of the source folder is of type '$($envelopeValue.GetType().FullName)', which is neither a scalar nor a sequence."
+        Write-Warning "The ItemProperties value of the file 'ItemProperties.yaml' of the source folder is a scalar, not a sequence; it is treated as the single entry of the sequence."
+        Write-Warning "The ItemProperties value of the file 'ItemProperties.yaml' of the source folder is of type '$($envelopeValue.GetType().FullName)' instead of a string; it is coerced to its invariant string form."
+        if ($envelopeValue -is [System.IFormattable]) {
+            $envelopeScalarValue = $envelopeValue.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture)
+        }
+        else {
+            $envelopeScalarValue = [string]$envelopeValue
+        }
+        $coercedEntries = [System.Collections.Generic.List[object]]::new()
+        $coercedEntries.Add($envelopeScalarValue)
+        $entriesValue = $coercedEntries
     }
 
     # Stage one row per property before appending anything, so that
@@ -303,15 +320,21 @@ function Compress-ItemPropertiesIntoRagsFile {
     $stagedRows = [System.Collections.Generic.List[object]]::new()
     $contributingEntries = [System.Collections.Generic.List[int]]::new()
 
-    # The ItemID values of the entries whose rows were staged are kept in
-    # a separate list so that ItemID values which differ only in character
-    # case can merge under the first-read casing (the expansion groups
-    # ItemID values case-insensitively, matching the collation of the
-    # database, so the appended data re-expands into one entry). A second
-    # parallel list keeps one ordinal property-name set per item, which
-    # validates the Unique Name column across every entry of its item,
-    # exactly like the expansion.
+    # The ItemID values of the entries are kept in one list, and the
+    # first-read raw values in a parallel list, so that ItemID values
+    # which differ only in character case can merge into the lowercased
+    # group ('Values are case-insensitive' and 'Always coerced to
+    # lowercase', docs/data-mapping.md, ItemProperties section, the
+    # grouping the expansion performs as well). Group names are the
+    # canonical lowercased values and are looked up ordinally, and the
+    # first-read raw value of every group is kept alongside, so that the
+    # merge comparison below can detect the entries whose raw ItemID
+    # values differ from the first-read one. A third parallel list keeps
+    # one ordinal property-name set per item, which validates the Unique
+    # Name column across every entry of its item, exactly like the
+    # expansion.
     $groupNames = [System.Collections.Generic.List[string]]::new()
+    $groupRawNames = [System.Collections.Generic.List[string]]::new()
     $groupNameSets = [System.Collections.Generic.List[object]]::new()
 
     for ($entryIndex = 0; $entryIndex -lt $entriesValue.Count; $entryIndex++) {
@@ -349,12 +372,6 @@ function Compress-ItemPropertiesIntoRagsFile {
             Write-Warning "The entry $($entryIndex + 1) of the file 'ItemProperties.yaml' of the source folder defines the unexpected key(s) $entryExtraKeyText; they are ignored."
         }
 
-        # The deferred warnings of the entry (an ItemID truncation
-        # round-trip loss and a case-mate merge) are kept in one list which
-        # the check phases below fill; they fire only when the entry has
-        # actually staged rows, as an entry which contributes no rows
-        # loses nothing at re-expansion.
-        $pendingWarnings = [System.Collections.Generic.List[string]]::new()
         # Locate and validate the ItemID value of the entry, which the
         # expansion writes as a string scalar. A scalar of any other type
         # (a hand-edited unquoted number, for example) is coerced to its
@@ -392,25 +409,44 @@ function Compress-ItemPropertiesIntoRagsFile {
 
         # Truncate the ItemID value to the length of the table column, as
         # a longer value could not be stored. The truncation runs before
-        # the case-insensitive grouping below, so two ItemID values which
+        # the lowercasing and grouping below, so two ItemID values which
         # become equal only by their truncation behave like any other set
-        # of case mates.
+        # of case mates. The warning fires as soon as the value is
+        # accepted - like every other ItemID-value warning, before the
+        # Name value of the entry is validated.
         if ($itemId.Length -gt 250) {
-            $pendingWarnings.Add("The ItemID value of the entry $($entryIndex + 1) of the file 'ItemProperties.yaml' of the source folder is $($itemId.Length) characters long, which exceeds the 250 characters of the table column; the value is truncated. Note that re-expanding the appended data then derives a different item from the truncated value.")
+            Write-Warning "The ItemID value of the entry $($entryIndex + 1) of the file 'ItemProperties.yaml' of the source folder is $($itemId.Length) characters long, which exceeds the 250 characters of the table column; the value is truncated. Note that re-expanding the appended data then derives a different item from the truncated value."
             $itemId = $itemId.Substring(0, 250)
         }
 
-        # Locate or create the case-insensitive group of the item, whose
-        # name keeps the casing read first. An entry whose ItemID differs
-        # from an earlier entry's value only in character case merges into
-        # the group; its warning is deferred until the entry has actually
-        # staged rows, as it describes the casing of appended data. An
-        # entry whose ItemID is exactly equal to a group name repeats the
-        # item of that group, which is warned about immediately, because
-        # one item cannot carry two property sets in the table.
+        # The List-column values of the ItemProperties table are documented
+        # as case-insensitive and always coerced to lowercase ('Values are
+        # case-insensitive' / 'Always coerced to lowercase' in the
+        # ItemProperties section of docs/data-mapping.md), so the truncated
+        # raw value is lowered with ToLowerInvariant (the invariant result
+        # is independent of the current culture). Everything below - the
+        # grouping and the appended rows - works with and cites this
+        # lowercased form; the raw value is kept only for the merge
+        # reporting of the grouping. The expansion of the appended data
+        # lowercases its read values anyway, so the lowercased rows
+        # re-expand with their ItemID value unchanged.
+        $itemIdRaw = $itemId
+        $itemId = $itemIdRaw.ToLowerInvariant()
+
+        # Locate or create the group of the item. The lowercased value is
+        # canonical, so the lookup compares ordinal against it (a
+        # case-insensitive comparison would change no outcome). The
+        # first-read raw value is kept per group, and an entry whose raw
+        # value differs from it is merged with a warning which cites the
+        # lowercased value on both sides; the first-read entry of a case
+        # mate set and entries repeating its raw value are appended
+        # without a warning, as append-only accumulation is the documented
+        # caller workflow. The warning fires as soon as the value is
+        # accepted - like every other ItemID-value warning, before the
+        # Name value of the entry is validated.
         $groupIndex = -1
         for ($candidateIndex = 0; $candidateIndex -lt $groupNames.Count; $candidateIndex++) {
-            if ([string]::Equals($groupNames[$candidateIndex], $itemId, [System.StringComparison]::OrdinalIgnoreCase)) {
+            if ([string]::Equals($groupNames[$candidateIndex], $itemId, [System.StringComparison]::Ordinal)) {
                 $groupIndex = $candidateIndex
                 break
             }
@@ -418,17 +454,15 @@ function Compress-ItemPropertiesIntoRagsFile {
         if ($groupIndex -lt 0) {
             $groupIndex = $groupNames.Count
             $groupNames.Add($itemId)
+            $groupRawNames.Add($itemIdRaw)
             $groupNameSets.Add([System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal))
         }
-        elseif (-not [string]::Equals($groupNames[$groupIndex], $itemId, [System.StringComparison]::Ordinal)) {
-            $pendingWarnings.Add("Merging the properties of the entry $($entryIndex + 1) of the file 'ItemProperties.yaml' of the source folder of item '$itemId' into the properties of item '$($groupNames[$groupIndex])': the ItemID values differ only in character case.")
-        }
-        else {
-            Write-Warning "The entry $($entryIndex + 1) of the file 'ItemProperties.yaml' of the source folder repeats the ItemID value of a previously read entry; the properties of both entries are appended under the same item."
+        elseif (-not [string]::Equals($groupRawNames[$groupIndex], $itemIdRaw, [System.StringComparison]::Ordinal)) {
+            Write-Warning "Merging the properties of the entry $($entryIndex + 1) of the file 'ItemProperties.yaml' of the source folder of item '$itemId' into the properties of item '$($groupNames[$groupIndex])': the raw ItemID value differs only in character case and is merged into the lowercased rows."
         }
 
         # Every appended row of the entry carries the group's ItemID value
-        # (the first-read casing of its set of case mates), and the
+        # (the lowercased form common to its set of case mates), and the
         # property names of the entry join the property-name set of that
         # item, exactly like the property names of any other entry of the
         # same item.
@@ -473,10 +507,7 @@ function Compress-ItemPropertiesIntoRagsFile {
             throw "Cannot compress the ItemProperties data of the RAGS file: the Name value of the entry $($entryIndex + 1) of the file 'ItemProperties.yaml' of the source folder of item '$stagedItemId' is of type '$($propertiesValue.GetType().FullName)', which is neither a scalar nor a sequence."
         }
 
-        # The row count staged for the entry is remembered before its
-        # properties are staged, so that the deferred warnings of the
-        # entry fire only when it actually contributed rows.
-        $entryRowsBefore = $stagedRows.Count
+        $stagedRowsBefore = $stagedRows.Count
         for ($propertyIndex = 0; $propertyIndex -lt $propertiesValue.Count; $propertyIndex++) {
             $propertyValue = $propertiesValue[$propertyIndex]
             if ($null -eq $propertyValue) {
@@ -608,14 +639,7 @@ function Compress-ItemPropertiesIntoRagsFile {
             })
         }
 
-        # The deferred warnings of the entry (an ItemID truncation
-        # round-trip loss and a case-mate merge) fire only when it
-        # actually contributed rows: an entry whose properties were all
-        # skipped loses nothing at re-expansion.
-        if ($stagedRows.Count -gt $entryRowsBefore) {
-            foreach ($pendingWarning in $pendingWarnings) {
-                Write-Warning $pendingWarning
-            }
+        if ($stagedRows.Count -gt $stagedRowsBefore) {
             $contributingEntries.Add($entryIndex + 1)
         }
     }

@@ -20,7 +20,9 @@ function Compress-ItemGroupsIntoRagsFile {
     value. One table row is appended per item group entry (the ID identity
     column is excluded and auto-supplied by the database), replicating the
     row order of the original expansion: entries keep their YAML sequence
-    order, which is the ascending Name order of the original table read.
+    order, which is the ascending Name order of the original table read
+    ("Table is sorted first by Name ascending, then by ID ascending",
+    docs/data-mapping.md, ItemGroups section).
 
     The 'ItemGroups.yaml' file is consumed as follows:
     - A file which defines more than one YAML document is consumed from
@@ -39,10 +41,13 @@ function Compress-ItemGroupsIntoRagsFile {
       contributes no rows without a warning.
     - An ItemGroups value which is a scalar or a single mapping (as
       hand-edited files omitting the trailing sequence dash commonly are)
-      is accepted as the single entry of the sequence with a warning (for
-      a scalar entry this aborts the operation in the entry validation
-      below); a value of any other type aborts the whole operation with
-      an exception.
+      is accepted as the single entry of the sequence with a warning; the
+      single entry is then validated like any other entry, so a scalar
+      single entry aborts the whole operation with an exception (no
+      meaningful row can be derived from it). An ItemGroups value which
+      is a scalar but not a string is first coerced to its string form
+      with a warning, the string form of format-sensitive values being
+      derived with the invariant culture.
     - Entries which are null are skipped with a warning. An entry which
       is not a mapping aborts the whole operation with an exception, as
       no meaningful row can be derived from it.
@@ -65,10 +70,14 @@ function Compress-ItemGroupsIntoRagsFile {
       null Parent column; empty or whitespace-only Parent values are
       stored as read.
     - An entry which repeats the Name value of a previously read entry,
-      ignoring character case (mirroring the case-insensitive unique check
-      of the expansion and the RAGS Designer limitation it documents), is
-      skipped with a warning which names the column values of the ignored
-      duplicate entry (the column values of the first read entry win).
+      ignoring character case, is skipped with a warning which names the
+      column values of the ignored duplicate entry (the column values of
+      the first read entry win). The duplicate comparison follows the
+      documented Unique rule for the 'ItemGroups' table in
+      docs/data-mapping.md ('If multiple identical Names exist, then
+      only the Parent of the first row will be read'; 'Values are
+      case-insensitive'; 'Only the first detected casing will be
+      read').
     - Keys of an entry other than the two column names are ignored with
       a warning.
 
@@ -164,9 +173,12 @@ function Compress-ItemGroupsIntoRagsFile {
     # ConvertFrom-Yaml returns the parsed value of a single document
     # directly (a mapping, a sequence or a scalar, as read), the values of
     # multiple documents as an object array, and no value at all for an
-    # empty stream. A missing value after the parse is therefore reported
-    # like a missing document.
-    $rootDocument = $parsedDocuments[0]
+    # empty or comment-only stream. A missing value after the parse is
+    # therefore reported like a missing document.
+    $rootDocument = $null
+    if ($parsedDocuments.Count -gt 0) {
+        $rootDocument = $parsedDocuments[0]
+    }
     if ($null -eq $rootDocument) {
         throw "Cannot compress the ItemGroups data of the RAGS file: the file 'ItemGroups.yaml' of the source folder carries no YAML document."
     }
@@ -230,7 +242,30 @@ function Compress-ItemGroupsIntoRagsFile {
         $entriesValue = $coercedEntries
     }
     else {
-        throw "Cannot compress the ItemGroups data of the RAGS file: the ItemGroups value of the file 'ItemGroups.yaml' of the source folder is of type '$($envelopeValue.GetType().FullName)', which is neither a scalar nor a sequence."
+        # A scalar envelope value of any kind is accepted as the single
+        # entry of the sequence (the dispatch above leaves only scalars
+        # here, so the classification can no longer fail); the single
+        # entry is validated like any other entry below, which is what
+        # a scalar single entry eventually fails with.
+        Write-Warning "The ItemGroups value of the file 'ItemGroups.yaml' of the source folder is a scalar, not a sequence; it is treated as the single entry of the sequence."
+        if ($envelopeValue -isnot [string]) {
+            # A non-string scalar (a hand-edited unquoted number, for
+            # example) is coerced to its string form with a warning; a
+            # number, a boolean or another format-sensitive form never
+            # coerces to a whitespace-only string, so no empty-value
+            # skip applies here.
+            Write-Warning "The ItemGroups value of the file 'ItemGroups.yaml' of the source folder is of type '$($envelopeValue.GetType().FullName)' instead of a string; it is coerced to its invariant string form."
+            if ($envelopeValue -is [System.IFormattable]) {
+                $envelopeValue = $envelopeValue.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture)
+            }
+            else {
+                $envelopeValue = [string]$envelopeValue
+            }
+        }
+
+        $coercedEntries = [System.Collections.Generic.List[object]]::new()
+        $coercedEntries.Add($envelopeValue)
+        $entriesValue = $coercedEntries
     }
 
     # Stage one row per item group entry before appending anything, so

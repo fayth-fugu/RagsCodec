@@ -16,26 +16,31 @@ function Expand-CharacterPropertiesFromRagsFile {
     whose value is a sequence with one entry per distinct Charname value.
     Each entry is a mapping of the Charname value and the Name key whose
     value is a sequence of mappings, one per CharacterProperties row of
-    that character: each of those holds the property Name and its Value.
-    The Value of a row is emitted as a YAML null when the column is null,
-    and multi-line values are emitted as YAML literal block scalars whose
-    line breaks were normalized to line-feed characters (YAML normalizes
-    line breaks to line feeds when a literal block is read back, so
-    carriage returns are normalized beforehand to keep the round-trip
-    byte-exact).
+    that character; each of those holds the property Name and its Value.
+    The Value of a row is emitted as a YAML null when the column is null;
+    multi-line values are emitted as YAML literal block scalars whose line
+    breaks were normalized to line-feed characters, because YAML normalizes
+    line breaks to line feeds when a literal block is read back (so
+    carriage returns are normalized beforehand, and because the
+    normalization runs before the duplicate-name check below, a duplicate
+    warning reports the normalized value of the ignored duplicate row).
 
-    Rows are grouped by the exact Charname value: names differ in character
-    case produce separate entries.
+    Rows are grouped by the exact Charname value: names which differ only
+    in character case produce separate entries, as documented for the
+    'CharacterProperties' table in docs/data-mapping.md ('Values are
+    case-sensitive').
 
     Rows with a null, empty or whitespace-only Charname or Name value are
-    skipped with a warning, as no meaningful entry or property key can be
-    derived from them. Rows within one character which repeat an exact,
-    previously read property Name are also skipped with a warning (the Value
-    of the first read row wins): all rows are sorted first by Charname, then
-    by Name and then by row ID, which both orders the reported rows and
-    makes the winning row of such a duplicate deterministic. Property names
-    which differ only in character case are distinct properties and never
-    considered duplicates.
+    skipped with a warning, as no file entry or property can be derived
+    from them. As documented for the 'CharacterProperties' table in
+    docs/data-mapping.md (the 'Unique'-column handling: property names are
+    expected to contain only distinct values and are case-sensitive), rows
+    within one character which repeat an exact, previously read property
+    Name are also skipped with a warning (the Value of the first read row
+    wins): all rows are sorted first by Charname, then by Name and then by
+    row ID, which both orders the reported rows and makes the winning row
+    of such a duplicate deterministic. Property names which differ only in
+    character case are distinct properties and never considered duplicates.
 
     The output folder is silently created when it is missing and the written
     file silently overwrites any existing one. An empty table expands to a
@@ -80,19 +85,22 @@ function Expand-CharacterPropertiesFromRagsFile {
     Write-Verbose "Expanding the CharacterProperties data into '$OutputPath'."
 
     # Read all rows of the table, ordered first by Charname, then by Name
-    # and then by row ID, as documented. The Charname and Name columns of
-    # the database are collated case-insensitively, so rows whose values
-    # differ only in character case may interleave here and sort next to
-    # each other; both cases are handled case-sensitively below.
+    # and then by row ID, as documented in docs/data-mapping.md. The
+    # Charname and Name columns of the database are collated
+    # case-insensitively, so rows whose values differ only in character
+    # case may interleave here and sort next to each other; both cases are
+    # handled case-sensitively below.
     Write-Verbose 'Reading the CharacterProperties rows of the RAGS file.'
     $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Charname], [Name], [Value] FROM [CharacterProperties] ORDER BY [Charname] ASC, [Name] ASC, [ID] ASC')
     Write-Verbose "Read $($rows.Count) CharacterProperties row(s)."
 
-    # Group the rows by the Charname value, case-sensitively by ordinal
-    # comparison (the grouping happens here because SQL Server Compact
-    # orders values case-insensitively, and PowerShell hashtables normalize
-    # keys case-insensitively as well). Names and property entries are kept
-    # as parallel lists so that the name lookup below can compare ordinally.
+    # Group the rows by the exact Charname value case-sensitively, as
+    # documented for the 'CharacterProperties' table in docs/data-mapping.md
+    # ('Values are case-sensitive'). The grouping happens here because SQL
+    # Server Compact orders values case-insensitively and PowerShell
+    # hashtables normalize keys case-insensitively as well; names and
+    # property entries are kept as parallel lists so that the name lookup
+    # below can compare ordinally.
     # For a fixed exact name the rows arrive in ascending Name and row ID
     # order (the SQL sort is a total order and equal exact names are only
     # separated by their row IDs), so processing each row as it arrives
@@ -136,7 +144,9 @@ function Expand-CharacterPropertiesFromRagsFile {
         # as a YAML null); every other value is read as a string whose line
         # breaks were normalized to line feed characters, because a YAML
         # literal block scalar normalizes line breaks that way when read
-        # back. Values are never skipped.
+        # back. Values are never skipped, and the normalization is done
+        # before the duplicate check below so that the ignored duplicate
+        # row's warning can report the ignored row's own value.
         $propertyValue = $row['Value']
         if (($null -eq $propertyValue) -or ($propertyValue -is [System.DBNull])) {
             $propertyValue = $null
@@ -145,17 +155,15 @@ function Expand-CharacterPropertiesFromRagsFile {
             $propertyValue = ([string]$propertyValue) -replace '\r\n?', "`n"
         }
 
-        # A null Value column is a meaningful property value (it is emitted
-        # as a YAML null; see the normalization above, which is done before
-        # the duplicate check so that its warning can report the value of
-        # the ignored row).
-
-        # Soft-validate the Unique Name column: the property Name of a
-        # character is expected to contain only distinct values, so a row
-        # which repeats the exact property name of a previously read row of
-        # the same character is skipped with a warning (the value of the
-        # first read row wins). Names which differ only in character case
-        # are distinct properties.
+        # Soft-validate the Unique Name column, as documented for the
+        # 'CharacterProperties' table in docs/data-mapping.md (the
+        # 'Unique'-column handling: if multiple identical property names
+        # exist for the same character, only the Value of the first row is
+        # read, and the names are case-sensitive): a row which repeats the
+        # exact property name of a previously read row of the same
+        # character is skipped with a warning (the value of the first read
+        # row wins). Names which differ only in character case are distinct
+        # properties.
         $duplicate = $false
         foreach ($existingProperty in $properties) {
             if ([string]::Equals([string]$existingProperty['Name'], $propertyName, [System.StringComparison]::Ordinal)) {

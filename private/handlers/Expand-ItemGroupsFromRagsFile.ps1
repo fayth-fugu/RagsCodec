@@ -20,13 +20,15 @@ function Expand-ItemGroupsFromRagsFile {
 
     Rows are expected to hold distinct Name values: the table is sorted by
     Name before it is read, so for every row after the first whose Name
-    compares equal (ignoring character case, as RAGS Designer does not
-    support item groups which differ only in capitalization) to a previously
-    read row the second and later rows are skipped with a warning which
-    names the column values of the ignored duplicate row — the column values
-    of the first read row win. Rows with a null, empty or whitespace-only
-    Name value are also skipped with a warning, as no item group entry key
-    can be derived from them.
+    compares equal to a previously read row — ignoring character case, per
+    the 'Values are case-insensitive' / 'Only the first detected casing
+    will be read' Unique handling documented for the table (see the
+    ItemGroups section of docs/data-mapping.md) — the second and later
+    rows are skipped with a warning which contains the column values of
+    the ignored duplicate row, as the documentation requires; the column
+    values of the first read row win. Rows with a null, empty or
+    whitespace-only Name value are also skipped with a warning, as no item
+    group entry key can be derived from them.
 
     The output folder is silently created when it is missing and the written
     file silently overwrites any existing one. An empty table expands to a
@@ -69,20 +71,24 @@ function Expand-ItemGroupsFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the ItemGroups data into '$OutputPath'."
 
-    # Read all rows of the table, ordered by Name and then by row ID, as
-    # documented. The Name column of the database is collated
-    # case-insensitively, so rows whose names differ only in character case
-    # sort next to each other and tie-break on their row ID; duplicates
-    # among them are dropped case-insensitively below, in the read order of
-    # the rows, so the row of the lowest ID within case mates wins.
+    # Read all rows of the table, ordered by Name and then by row ID
+    # ("Table is sorted first by Name ascending, then by ID ascending",
+    # docs/data-mapping.md, ItemGroups section). The Name column of the
+    # database is collated case-insensitively, so rows whose names differ
+    # only in character case sort next to each other and tie-break on
+    # their row ID; duplicates among them are dropped case-insensitively
+    # below, in the read order of the rows, so the row of the lowest ID
+    # within case mates wins.
     Write-Verbose 'Reading the ItemGroups rows of the RAGS file.'
     $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Name], [Parent] FROM [ItemGroups] ORDER BY [Name] ASC, [ID] ASC')
     Write-Verbose "Read $($rows.Count) ItemGroups row(s)."
 
     # The Name values of the item groups whose entries were built, kept in a
     # separate list so that the duplicate check below can compare
-    # case-insensitively (the Unique semantics of this table follow the
-    # case-insensitive database collation, as documented for RAGS Designer).
+    # case-insensitively (the documented Unique handling of the table —
+    # "If multiple identical Names exist, then only the Parent of the first
+    # row will be read" with "Values are case-insensitive", see the
+    # ItemGroups section of docs/data-mapping.md).
     $admittedNames = [System.Collections.Generic.List[string]]::new()
     $entries = [System.Collections.Generic.List[object]]::new()
 
@@ -109,8 +115,10 @@ function Expand-ItemGroupsFromRagsFile {
 
         # Soft-validate the Unique Name column: a row whose value compares
         # equal to a previously read row's value, ignoring character case, is
-        # skipped with a warning naming the column values of the ignored
-        # duplicate row (the column values of the first read row win).
+        # skipped with a warning containing the column values of the ignored
+        # duplicate row ("A warning containing the values of subsequent
+        # ignored duplicate rows will be shown", docs/data-mapping.md,
+        # ItemGroups section; the column values of the first read row win).
         $duplicate = $false
         foreach ($existingName in $admittedNames) {
             if ([string]::Equals($existingName, $name, [System.StringComparison]::OrdinalIgnoreCase)) {

@@ -23,15 +23,17 @@ function Expand-CharactersFromRagsFile {
     carriage returns are normalized beforehand to keep the round-trip
     byte-exact). Every other null column value is emitted as a YAML null.
 
-    Rows are expected to hold distinct Charname values: the table is sorted
-    by Charname before it is read, so for every character after the first
-    whose Charname compares equal (ignoring character case, mirroring the
-    case-insensitive database collation) to a previously read character the
-    second and later rows are skipped with a warning which names the column
-    values of the ignored duplicate row — the column values of the first
-    read row win. Rows with a null, empty or whitespace-only Charname value
-    are also skipped with a warning, as no character entry key can be
-    derived from them.
+    Rows are expected to hold distinct Charname values: the table is
+    sorted by Charname ascending, as documented for the 'Characters' table
+    in docs/data-mapping.md, so for every character after the first whose
+    Charname compares equal to a previously read character, ignoring
+    character case, the second and later rows are skipped with a warning
+    which names the column values of the ignored duplicate row — the
+    column values of the first read row win. The duplicate comparison is
+    case-insensitive as documented ('Values are case-insensitive'; only
+    the first detected casing will be read). Rows with a null, empty or
+    whitespace-only Charname value are also skipped with a warning, as no
+    character entry key can be derived from them.
 
     The output folder is silently created when it is missing and the written
     file silently overwrites any existing one. An empty table expands to a
@@ -74,11 +76,14 @@ function Expand-CharactersFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the Characters data into '$OutputPath'."
 
-    # Read all rows of the table, ordered by Charname, as documented. The
+    # Read all rows of the table, ordered by Charname ascending, as
+    # documented for the 'Characters' table in docs/data-mapping.md. The
     # Charname column of the database is collated case-insensitively, so
     # rows of characters whose names differ only in character case sort
-    # next to each other here; duplicates among them are dropped case-
-    # insensitively below, in the read order of the rows.
+    # next to each other here (with no identity column in the SELECT,
+    # their relative read order is the engine's tiebreak); duplicates
+    # among them are dropped case-insensitively below, in the read order
+    # of the rows.
     Write-Verbose 'Reading the Characters rows of the RAGS file.'
     $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [Charname], [CharnameOverride], [CharGender], [CurrentRoom], [Description], [AllowInventoryInteraction], [EnterFirstTime], [LeaveFirstTime], [CharPortrait] FROM [Characters] ORDER BY [Charname] ASC')
     Write-Verbose "Read $($rows.Count) Characters row(s)."
@@ -90,9 +95,9 @@ function Expand-CharactersFromRagsFile {
 
     # The Charname values of the characters whose entries were built,
     # kept in a separate list so that the duplicate check below can
-    # compare case-insensitively (the Unique semantics follow the
-    # case-insensitive database collation, in deviation from the other
-    # expansions which group case-sensitively).
+    # compare case-insensitively, as the documented Unique rule for the
+    # 'Characters' table in docs/data-mapping.md requires ('Values are
+    # case-insensitive').
     $admittedCharnames = [System.Collections.Generic.List[string]]::new()
     $entries = [System.Collections.Generic.List[object]]::new()
 
@@ -145,7 +150,10 @@ function Expand-CharactersFromRagsFile {
         }
 
         # The managed reader returns bit columns as Boolean values; a
-        # missing value is read as the documented false.
+        # missing value is read as the documented false. The duplicate
+        # warning below accordingly cites these values as read at this
+        # point ('after reading'): a row storing a null is reported with
+        # the false it was read as, never with the null it holds.
         $allowInventoryInteraction = $row['AllowInventoryInteraction']
         if (($null -eq $allowInventoryInteraction) -or ($allowInventoryInteraction -is [System.DBNull])) {
             $allowInventoryInteraction = $false
@@ -169,11 +177,12 @@ function Expand-CharactersFromRagsFile {
             $charPortrait = [string]$charPortrait
         }
 
-        # Soft-validate the Unique Charname column: a row whose value
-        # compares equal to a previously read row's value, ignoring
-        # character case, is skipped with a warning naming the column
-        # values of the ignored duplicate row (the column values of the
-        # first read row win).
+        # Soft-validate the Unique Charname column, as documented for the
+        # 'Characters' table in docs/data-mapping.md (only the first
+        # detected casing will be read): a row whose value compares equal
+        # to a previously read row's value, ignoring character case, is
+        # skipped with a warning naming the column values of the ignored
+        # duplicate row (the column values of the first read row win).
         $duplicate = $false
         foreach ($existingCharname in $admittedCharnames) {
             if ([string]::Equals($existingCharname, $charname, [System.StringComparison]::OrdinalIgnoreCase)) {

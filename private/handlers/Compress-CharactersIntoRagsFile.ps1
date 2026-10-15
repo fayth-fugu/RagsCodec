@@ -20,7 +20,8 @@ function Compress-CharactersIntoRagsFile {
     values. One table row is appended per character entry (the Characters
     table holds no identity column), replicating the row order of the
     original expansion: entries keep their YAML sequence order, which is
-    the ascending Charname order of the original table read.
+    the ascending Charname order of the original table read, as
+    documented for the 'Characters' table in docs/data-mapping.md.
 
     The 'Characters.yaml' file is consumed as follows:
     - A file which defines more than one YAML document is consumed from
@@ -38,16 +39,24 @@ function Compress-CharactersIntoRagsFile {
       contributes no rows without a warning.
     - A Characters value which is a scalar or a single mapping (as
       hand-edited files omitting the trailing sequence dash commonly are)
-      is accepted as the single entry of the sequence with a warning; a
-      value of any other type aborts the whole operation with an
-      exception.
+      is accepted as the single entry of the sequence with a warning; the
+      single entry is then validated like any other entry, so a scalar
+      single entry aborts the whole operation with an exception (no
+      meaningful row can be derived from it). A Characters value which
+      is a scalar but not a string is first coerced to its string form
+      with a warning, the string form of format-sensitive values being
+      derived with the invariant culture.
     - Entries which are null are skipped with a warning. An entry which
       is not a mapping aborts the whole operation with an exception, as
       no meaningful row can be derived from it.
-    - An entry whose Charname value is not a string aborts the whole
-      operation with an exception. An entry whose Charname value is
-      missing, null, empty or whitespace-only is skipped in its entirety
-      with a warning, as no character entry key can be derived from it.
+    - An entry whose Charname value is missing, null, empty or
+      whitespace-only is skipped in its entirety with a warning, as no
+      character entry key can be derived from it. An entry whose
+      Charname value is a sequence or a mapping aborts the whole
+      operation with an exception; a Charname value which is a scalar
+      but not a string (a hand-edited unquoted number, for example) is
+      coerced to its string form with a warning, the string form of
+      format-sensitive values being derived with the invariant culture.
     - A Charname value longer than the 250 characters of the table column
       is truncated with a warning; note that re-expanding the appended
       data then derives a different entry from the truncated value.
@@ -56,12 +65,19 @@ function Compress-CharactersIntoRagsFile {
       form with a warning; the string form of format-sensitive values is
       derived with the invariant culture, so such a value round-trips
       through hosts of different cultures. This applies to the
-      CharnameOverride, CurrentRoom, Description and CharPortrait values.
-      The CharnameOverride value is truncated to the 250 characters of
+      CharnameOverride, CurrentRoom and CharPortrait values. The
+      CharnameOverride value is truncated to the 250 characters of
       its table column, the CharPortrait value to the 255 characters of
       its column; a text column value which is a sequence or a mapping
       aborts the whole operation with an exception, as no meaningful
       scalar can be derived from it.
+    - The Description value (which never carries a length limit) is
+      stored with the same scalar coercion as the text columns, except
+      that its line breaks are normalized to line feeds without a
+      warning: the expansion emits the Description value with line-feed
+      line breaks, so a stored carriage-return value would expand into
+      different data. A Description value which is a sequence or a
+      mapping aborts the whole operation with an exception.
     - A CharGender value which is missing or null is stored as a database
       null without a warning, as the expansion emits a YAML null for a
       null CharGender column. A CharGender value which is an integer
@@ -75,11 +91,12 @@ function Compress-CharactersIntoRagsFile {
       integer scalar of 1 or 0 is accepted with a warning; a value of any
       other type or content aborts the whole operation with an exception.
     - An entry which repeats the Charname value of a previously read
-      entry, ignoring character case (mirroring the case-insensitive
-      unique check of the expansion and the RAGS Designer limitation it
-      documents), is skipped with a warning which names the column values
-      of the ignored duplicate entry (the column values of the first read
-      entry win).
+      entry is skipped with a warning which names the column values of
+      the ignored duplicate entry (the column values of the first read
+      entry win). The duplicate comparison ignores character case, as
+      the documented Unique rule for the 'Characters' table in
+      docs/data-mapping.md requires ('Values are case-insensitive';
+      'Only the first detected casing will be read').
     - Keys of an entry other than the nine column names are ignored with
       a warning.
 
@@ -173,11 +190,14 @@ function Compress-CharactersIntoRagsFile {
     }
 
     # ConvertFrom-Yaml returns the parsed value of a single document
-    # directly (a mapping, a sequence or a scalar, as read), the values of
-    # multiple documents as an object array, and no value at all for an
-    # empty stream. A missing value after the parse is therefore reported
-    # like a missing document.
-    $rootDocument = $parsedDocuments[0]
+    # directly (a mapping, a sequence or a scalar, as read), the values
+    # of multiple documents as an object array, and no value at all for
+    # an empty or comment-only stream. A missing value after the parse
+    # is therefore reported like a missing document.
+    $rootDocument = $null
+    if ($parsedDocuments.Count -gt 0) {
+        $rootDocument = $parsedDocuments[0]
+    }
     if ($null -eq $rootDocument) {
         throw "Cannot compress the Characters data of the RAGS file: the file 'Characters.yaml' of the source folder carries no YAML document."
     }
@@ -242,7 +262,30 @@ function Compress-CharactersIntoRagsFile {
         $entriesValue = $coercedEntries
     }
     else {
-        throw "Cannot compress the Characters data of the RAGS file: the Characters value of the file 'Characters.yaml' of the source folder is of type '$($envelopeValue.GetType().FullName)', which is neither a scalar nor a sequence."
+        # A scalar envelope value of any kind is accepted as the single
+        # entry of the sequence (the dispatch above leaves only scalars
+        # here, so the classification can no longer fail); the single
+        # entry is validated like any other entry below, which is what
+        # a scalar single entry eventually fails with.
+        Write-Warning "The Characters value of the file 'Characters.yaml' of the source folder is a scalar, not a sequence; it is treated as the single entry of the sequence."
+        if ($envelopeValue -isnot [string]) {
+            # A non-string scalar (a hand-edited unquoted number, for
+            # example) is coerced to its string form with a warning; a
+            # number, a boolean or another format-sensitive form never
+            # coerces to a whitespace-only string, so no empty-value
+            # skip applies here.
+            Write-Warning "The Characters value of the file 'Characters.yaml' of the source folder is of type '$($envelopeValue.GetType().FullName)' instead of a string; it is coerced to its invariant string form."
+            if ($envelopeValue -is [System.IFormattable]) {
+                $envelopeValue = $envelopeValue.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture)
+            }
+            else {
+                $envelopeValue = [string]$envelopeValue
+            }
+        }
+
+        $coercedEntries = [System.Collections.Generic.List[object]]::new()
+        $coercedEntries.Add($envelopeValue)
+        $entriesValue = $coercedEntries
     }
 
     # Stage one row per character entry before appending anything, so that
@@ -258,9 +301,9 @@ function Compress-CharactersIntoRagsFile {
 
     # The Charname values of the entries whose rows were staged are kept
     # separately so that the duplicate check can compare them
-    # case-insensitively (the Unique semantics follow the case-insensitive
-    # database collation, in deviation from the compressions which group
-    # case-sensitively).
+    # case-insensitively, as the documented Unique rule for the
+    # 'Characters' table in docs/data-mapping.md requires ('Values are
+    # case-insensitive').
     $admittedCharnames = [System.Collections.Generic.List[string]]::new()
 
     for ($entryIndex = 0; $entryIndex -lt $entriesValue.Count; $entryIndex++) {
@@ -284,14 +327,30 @@ function Compress-CharactersIntoRagsFile {
         }
 
         # Locate and validate the Charname value of the entry, which is
-        # expected to be the string scalar the expansion wrote.
+        # expected to be the string scalar the expansion wrote. A
+        # non-string scalar (a hand-edited unquoted number, for example)
+        # is coerced to its string form with a warning, mirroring the
+        # tolerant scalar ladder of the other text columns; a sequence
+        # or a mapping value aborts the whole operation.
         $entryCharname = $entryValue['Charname']
         if ($null -eq $entryCharname) {
             Write-Warning "Skipping the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder: the Charname value is missing or null, so no character entry can be derived for it."
             continue
         }
+        if ($entryCharname -is [System.Collections.IList]) {
+            throw "Cannot compress the Characters data of the RAGS file: the Charname of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder carries a sequence where a scalar value is expected."
+        }
+        if ($entryCharname -is [System.Collections.IDictionary]) {
+            throw "Cannot compress the Characters data of the RAGS file: the Charname of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder carries a mapping where a scalar value is expected."
+        }
         if ($entryCharname -isnot [string]) {
-            throw "Cannot compress the Characters data of the RAGS file: the Charname value of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder is of type '$($entryCharname.GetType().FullName)' instead of a string."
+            Write-Warning "The Charname of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder is of type '$($entryCharname.GetType().FullName)' instead of a string; it is coerced to its invariant string form."
+            if ($entryCharname -is [System.IFormattable]) {
+                $entryCharname = $entryCharname.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture)
+            }
+            else {
+                $entryCharname = [string]$entryCharname
+            }
         }
         if ([string]::IsNullOrWhiteSpace($entryCharname)) {
             Write-Warning "Skipping the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder: the Charname value is empty, so no character entry can be derived for it."
@@ -402,10 +461,15 @@ function Compress-CharactersIntoRagsFile {
             }
         }
 
-        # The Description value is stored as read (the expansion normalizes
-        # line breaks on both sides of the round-trip), with the same
-        # scalar coercion as the other text columns. Like every ntext
-        # column it holds no length limit to truncate to.
+        # The Description value is stored with the same scalar coercion
+        # as the other text columns, except that its line breaks are
+        # normalized to line feeds without a warning: the expansion
+        # emits the Description value with line-feed line breaks (and a
+        # literal block re-parses normalized as well), so a stored
+        # carriage-return value would expand into different data. Like
+        # every ntext column it holds no length limit to truncate to,
+        # and the normalization runs before the duplicate evidence
+        # below so that the warning reports the stored value.
         $descriptionValue = $entryValue['Description']
         $description = $null
         if ($null -ne $descriptionValue) {
@@ -416,15 +480,15 @@ function Compress-CharactersIntoRagsFile {
                 throw "Cannot compress the Characters data of the RAGS file: the Description of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder carries a mapping where a scalar value is expected."
             }
             elseif ($descriptionValue -is [string]) {
-                $description = $descriptionValue
+                $description = ($descriptionValue -replace '\r\n?', "`n")
             }
             else {
                 Write-Warning "The Description of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder is of type '$($descriptionValue.GetType().FullName)' instead of a string; it is coerced to its invariant string form."
                 if ($descriptionValue -is [System.IFormattable]) {
-                    $description = $descriptionValue.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture)
+                    $description = ($descriptionValue.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture) -replace '\r\n?', "`n")
                 }
                 else {
-                    $description = [string]$descriptionValue
+                    $description = ([string]$descriptionValue -replace '\r\n?', "`n")
                 }
             }
         }

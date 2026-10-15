@@ -13,11 +13,15 @@ function Expand-CharacterActionsFromRagsFile {
     'CharacterActions' subfolder of the output folder, following the
     conventions documented in docs/data-mapping.md.
 
-    Each file is named by the GUID derived from the Charname value (see
-    ConvertTo-RagsFilenameGuid) with a lowercase '.yaml' extension and
-    contains a mapping with the Charname value and the Data sequence holding
-    one entry per Data row of the character. Each entry is expanded from the
-    encoded RAGS action of the row (Base64-decoded, GZip-decompressed and
+    Each file is named by the GUID derived from the Charname value: the
+    UTF-8 encoded bytes of the value are MD5-hashed and the resulting
+    16-byte digest is used directly as the GUID (see
+    ConvertTo-RagsFilenameGuid and the GUID file name generation rule of
+    docs/data-mapping.md), whose lowercase, dash-separated string form is
+    followed by a lowercase '.yaml' extension. The file contains a mapping
+    with the Charname value and the Data sequence holding one entry per
+    Data row of the character. Each entry is expanded from the encoded
+    RAGS action of the row (Base64-decoded, GZip-decompressed and
     pretty-printed XML) through Expand-RagsActionIntoXml.
 
     Rows with a null, empty or whitespace-only Charname or Data value are
@@ -27,11 +31,18 @@ function Expand-CharacterActionsFromRagsFile {
     written (all payloads are expanded before any file is created).
 
     The subfolder and its parent folders are created silently when missing,
-    and written files silently overwrite existing ones. Rows of one character
-    appear in the Data sequence in ascending row ID order (rows of
-    intermingled characters whose names differ only in character case are
-    grouped case-sensitively, keeping each character's rows ID-ordered);
-    such characters are expanded into separate files.
+    and written files silently overwrite existing ones.
+
+    The documentation pins the Charname values of the CharacterActions List
+    column as case-sensitive, so rows whose Charname values differ only in
+    character case describe separate characters; they are grouped
+    case-sensitively (by ordinal comparison) and expanded into separate
+    files, one per exact name. The database orders values
+    case-insensitively, so rows of such characters may interleave in the
+    read result; the grouping happens in this handler. Rows of one
+    character appear in the Data sequence in ascending row ID order
+    regardless, and characters whose every row was skipped produce no
+    file.
 
     .PARAMETER OutputPath
     Path of the folder to export the expanded CharacterActions data into.
@@ -73,22 +84,25 @@ function Expand-CharacterActionsFromRagsFile {
     # Read all rows of the table, ordered first by Charname and then by row
     # ID, as documented. The Charname column of the database is collated
     # case-insensitively, so rows of characters whose names differ only in
-    # character case may interleave here; they are grouped case-sensitively
-    # below.
+    # character case may interleave here; they are grouped
+    # case-sensitively below, as the documentation pins the Charname values
+    # of the CharacterActions List column case-sensitive (see
+    # docs/data-mapping.md).
     Write-Verbose 'Reading the CharacterActions rows of the RAGS file.'
     $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Charname], [Data] FROM [CharacterActions] ORDER BY [Charname] ASC, [ID] ASC')
     Write-Verbose "Read $($rows.Count) CharacterActions row(s)."
 
-    # Group the expanded payloads by the Charname value, case-sensitively by
-    # ordinal comparison (the grouping happens here because SQL Server
-    # Compact orders values case-insensitively, and PowerShell hashtables
-    # normalize keys case-insensitively as well). Names and payload lists are
-    # kept as parallel lists so that the name lookup below can compare
-    # ordinally. For a fixed exact name the rows arrive in ascending ID
-    # order (the SQL sort is a total order and equal exact names are only
-    # separated by their row IDs), so appending each expanded payload to its
-    # group as the rows arrive preserves the documented row order within
-    # every group.
+    # Group the expanded payloads by the Charname value. The documentation
+    # pins the Charname values case-sensitive, so the grouping key is the
+    # exact value compared ordinally (the grouping happens here because SQL
+    # Server Compact orders values case-insensitively, and PowerShell
+    # hashtables normalize keys case-insensitively as well). Names and
+    # payload lists are kept as parallel lists so that the name lookup
+    # below can compare ordinally. For a fixed exact name the rows arrive
+    # in ascending ID order (the SQL sort is a total order and equal exact
+    # names are only separated by their row IDs), so appending each
+    # expanded payload to its group as the rows arrive preserves the
+    # documented row order within every group.
     $groupNames = [System.Collections.Generic.List[string]]::new()
     $groupPayloads = [System.Collections.Generic.List[object]]::new()
 
@@ -136,7 +150,10 @@ function Expand-CharacterActionsFromRagsFile {
         # A YAML literal block scalar normalizes line breaks to line-feed
         # characters when the written YAML is read back, so carriage returns
         # are normalized away beforehand to keep the round-trip byte-exact.
-        $groupPayloads[$groupIndex].Add(($actionXml -replace '\r\n?', "`n"))
+        # The normalized value is assigned before the method call, as an
+        # operator expression as a direct method argument mis-tokenizes.
+        $normalizedActionXml = $actionXml -replace '\r\n?', "`n"
+        $groupPayloads[$groupIndex].Add($normalizedActionXml)
     }
 
     # Write one YAML file per character group. Characters whose every row was

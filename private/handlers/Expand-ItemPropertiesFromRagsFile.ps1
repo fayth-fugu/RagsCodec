@@ -18,13 +18,21 @@ function Expand-ItemPropertiesFromRagsFile {
     a sequence of mappings, one per ItemProperties row of that item: each
     of those holds the property Name and its Value.
 
-    Rows are grouped by the ItemID value case-insensitively, mirroring the
-    case-insensitive collation of the database: ItemID values which differ
-    only in character case belong to one and the same item. The casing of
-    the first read row names the group (which case mate is read first is
-    determined by the sorting rules of the table), and
-    every later row whose ItemID differs from that group name only in
-    character case is merged into the entry with a warning.
+    Rows whose ItemID values differ only in character case form one entry:
+    the item identity of the property data is treated case-insensitively
+    ('Values are case-insensitive', docs/data-mapping.md, ItemProperties
+    section), and every read ItemID value is normalized to lowercase
+    ('Always coerced to lowercase', docs/data-mapping.md, ItemProperties
+    section): after the null and empty checks, the value is lowercased
+    with ToLowerInvariant, so the entry's ItemID key is always the
+    lowercase form of the value. The case mate whose raw casing is read
+    first (which is the case mate with the lowest property Name and then
+    the lowest row ID, since the table is sorted by ItemID, then by Name
+    and then by row ID) opens the entry, and every later row whose raw
+    ItemID value differs from that first-read raw value only in character
+    case is merged into the entry with a warning describing the merge; its
+    property is written into the same property sequence. Every warning and
+    verbose message of the expansion cites the lowercased ItemID value.
 
     The Value of a row is emitted as a YAML null when the column is null,
     and multi-line values are emitted as YAML literal block scalars whose
@@ -86,27 +94,31 @@ function Expand-ItemPropertiesFromRagsFile {
     Write-Verbose "Expanding the ItemProperties data into '$OutputPath'."
 
     # Read all rows of the table, ordered first by ItemID, then by Name
-    # and then by row ID, as documented. The ItemID and Name columns of
-    # the database are collated case-insensitively, so rows whose values
-    # differ only in character case may interleave here and sort next to
-    # each other.
+    # and then by row ID ('Table is sorted first by ItemID ascending, then
+    # by Name ascending, then by ID ascending', docs/data-mapping.md,
+    # ItemProperties section). The ItemID and Name columns of the database
+    # are collated case-insensitively, so rows whose values differ only in
+    # character case may interleave here and sort next to each other.
     Write-Verbose 'Reading the ItemProperties rows of the RAGS file.'
     $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [ItemID], [Name], [Value] FROM [ItemProperties] ORDER BY [ItemID] ASC, [Name] ASC, [ID] ASC')
     Write-Verbose "Read $($rows.Count) ItemProperties row(s)."
 
-    # Group the rows by the ItemID value case-insensitively (see above;
-    # the grouping happens here because SQL Server Compact orders values
-    # case-insensitively and PowerShell hashtables normalize keys
-    # case-insensitively as well). Group names and per-item property lists
-    # are kept as parallel lists so that the name lookup below can compare
-    # each candidate with the case-insensitive contract, while the
-    # duplicate check further down compares property names ordinally. For
-    # a fixed case-insensitive item name the rows arrive in ascending Name
-    # and row ID order (the SQL sort is a total order within a set of case
-    # mates, separated by their property names and row IDs), so processing
-    # each row as it arrives preserves the documented row order within
-    # every group.
+    # Group the rows by their lowercased ItemID value ('Always coerced to
+    # lowercase', docs/data-mapping.md, ItemProperties section; the
+    # grouping happens here because SQL Server Compact orders values
+    # case-insensitively). Group names are the canonical lowercased values
+    # and are looked up ordinally, and the first-read raw value of every
+    # group is kept alongside, so that the merge comparison below can
+    # detect the rows whose raw casing differs from the first-read one.
+    # Group names, first-read raw names and per-item property lists are
+    # kept as parallel lists, while the duplicate check further down
+    # compares property names ordinally. For a fixed lowercased item name
+    # the rows arrive in ascending Name and row ID order (the SQL sort is
+    # a total order within a set of case mates, separated by their
+    # property names and row IDs), so processing each row as it arrives
+    # preserves the documented row order within every group.
     $groupNames = [System.Collections.Generic.List[string]]::new()
+    $groupRawNames = [System.Collections.Generic.List[string]]::new()
     $groupProperties = [System.Collections.Generic.List[object]]::new()
 
     foreach ($row in $rows) {
@@ -117,7 +129,13 @@ function Expand-ItemPropertiesFromRagsFile {
             Write-Warning "Skipping the ItemProperties row (ID '$rowId'): the ItemID value is null or empty, so no file entry can be derived for it."
             continue
         }
-        $itemId = [string]$itemId
+        # The ItemID values are always coerced to lowercase ('Always
+        # coerced to lowercase', docs/data-mapping.md, ItemProperties
+        # section): the raw value is kept for the merge comparison below,
+        # and every later use (the entry key and the citations of the
+        # warnings and verbose messages) gets the lowercased form.
+        $rawItemId = [string]$itemId
+        $itemId = $rawItemId.ToLowerInvariant()
 
         $propertyName = $row['Name']
         if (($null -eq $propertyName) -or ($propertyName -is [System.DBNull]) -or [string]::IsNullOrWhiteSpace([string]$propertyName)) {
@@ -126,13 +144,16 @@ function Expand-ItemPropertiesFromRagsFile {
         }
         $propertyName = [string]$propertyName
 
-        # Locate or create the case-insensitive group of the item. A row
-        # whose ItemID differs from the group name only in character case
-        # is merged into the group with a warning; its property is written
-        # into the same group under the group's casing.
+        # Locate or create the group of the item by its lowercased value
+        # (an ordinal lookup: two lowercased values are the same group
+        # exactly when they are equal). A row whose raw ItemID value
+        # differs from the first-read raw value of the group only in
+        # character case is merged into the group with a warning; its
+        # property is written into the same property sequence under the
+        # lowercased group key.
         $groupIndex = -1
         for ($candidateIndex = 0; $candidateIndex -lt $groupNames.Count; $candidateIndex++) {
-            if ([string]::Equals($groupNames[$candidateIndex], $itemId, [System.StringComparison]::OrdinalIgnoreCase)) {
+            if ([string]::Equals($groupNames[$candidateIndex], $itemId, [System.StringComparison]::Ordinal)) {
                 $groupIndex = $candidateIndex
                 break
             }
@@ -140,10 +161,11 @@ function Expand-ItemPropertiesFromRagsFile {
         if ($groupIndex -lt 0) {
             $groupIndex = $groupNames.Count
             $groupNames.Add($itemId)
+            $groupRawNames.Add($rawItemId)
             $groupProperties.Add([System.Collections.Generic.List[object]]::new())
         }
-        elseif (-not [string]::Equals($groupNames[$groupIndex], $itemId, [System.StringComparison]::Ordinal)) {
-            Write-Warning "Merging the ItemProperties row of item '$itemId' (ID '$rowId') into the entry of item '$($groupNames[$groupIndex])': the ItemID values differ only in character case."
+        elseif (-not [string]::Equals($groupRawNames[$groupIndex], $rawItemId, [System.StringComparison]::Ordinal)) {
+            Write-Warning "Merging the ItemProperties row of item '$itemId' (ID '$rowId') into the entry of item '$($groupNames[$groupIndex])': the raw ItemID value differs only in character case and is merged into the lowercased entry key."
         }
         $properties = $groupProperties[$groupIndex]
 
@@ -190,8 +212,8 @@ function Expand-ItemPropertiesFromRagsFile {
     }
 
     # Build the top-level entry list, one entry per item in first-row
-    # order (= ascending ItemID of the case-insensitive group names, from
-    # the SQL sort).
+    # order (= ascending lowercased ItemID of the case-insensitive group
+    # names, from the SQL sort).
     $entries = [System.Collections.Generic.List[object]]::new()
     for ($groupIndex = 0; $groupIndex -lt $groupNames.Count; $groupIndex++) {
         $entries.Add([ordered]@{

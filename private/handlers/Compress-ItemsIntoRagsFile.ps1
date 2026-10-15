@@ -21,7 +21,8 @@ function Compress-ItemsIntoRagsFile {
     (the Items table holds no identity column), replicating the row
     order of the original expansion: entries keep their YAML sequence
     order, which is the ascending UniqueID order of the original table
-    read.
+    read ('Table is sorted by UniqueID ascending',
+    docs/data-mapping.md, Items section).
 
     The 'Items.yaml' file is consumed as follows:
     - A file which defines more than one YAML document is consumed from
@@ -40,8 +41,13 @@ function Compress-ItemsIntoRagsFile {
     - An Items value which is a scalar or a single mapping (as
       hand-edited files omitting the trailing sequence dash commonly
       are) is accepted as the single entry of the sequence with a
-      warning; a value of any other type aborts the whole operation
-      with an exception.
+      warning, and the single entry then follows the entry rules below
+      (a scalar entry aborts the whole operation with the contextual
+      entry exception). An Items value which is a scalar but not a
+      string is derived to its string form with a further warning, the
+      string form of format-sensitive values being derived with the
+      invariant culture, so the coerced entry carries its round-tripping
+      value across hosts of different cultures.
     - Entries which are null are skipped with a warning. An entry which
       is not a mapping aborts the whole operation with an exception, as
       no meaningful row can be derived from it.
@@ -59,15 +65,20 @@ function Compress-ItemsIntoRagsFile {
       the appended data then derives a different entry from the
       truncated value.
     - The UniqueID values are always stored lowercased, mirroring the
-      documented Unique handling of the expansion (its values are
-      always coerced to lowercase): a UniqueID value which differs from
-      its lowercase form is stored lowercased with a warning, so
-      re-expanding the appended data keys the entry lowercase again.
+      documented Unique handling of the expansion ('Values are
+      case-insensitive' and 'Always coerced to lowercase',
+      docs/data-mapping.md, Items section), so that re-expanding the
+      appended data keys the entry lowercase again. The lowercasing is
+      silent; the duplicate check below reports a repeated entry, and a
+      lone mixed-case entry documents its drift on re-expansion.
     - An entry which repeats the UniqueID value of a previously read
-      entry, ignoring character case (mirroring the case-insensitive
-      unique check of the expansion), is skipped with a warning which
+      entry, ignoring character case, is skipped with a warning which
       names the column values of the ignored duplicate entry (the
-      column values of the first read entry win).
+      column values of the first read entry win), as the documentation
+      requires ('If multiple identical UniqueIDs exist, then only the
+      first row's column values will be read' and 'A warning containing
+      the values of subsequent ignored duplicate rows will be shown',
+      docs/data-mapping.md, Items section).
     - A text column value (Name, SDesc, Preposition, LocationName and
       GroupName) which is a scalar but not a string (a hand-edited
       unquoted number, for example) is coerced to its string form with
@@ -282,7 +293,29 @@ function Compress-ItemsIntoRagsFile {
         $entriesValue = $coercedEntries
     }
     else {
-        throw "Cannot compress the Items data of the RAGS file: the Items value of the file 'Items.yaml' of the source folder is of type '$($envelopeValue.GetType().FullName)', which is neither a scalar nor a sequence."
+        # The full envelope ladder of the other compressors (Characters,
+        # ItemGroups, ItemLayeredZoneLevels, ItemProperties): a scalar
+        # envelope of any type is classified and handed to the entry
+        # validation as the single entry of the sequence, a non-string
+        # scalar being derived to its invariant string form with a
+        # further warning (the string form of format-sensitive values
+        # keeps its round-tripping form across hosts). The coerced value
+        # is a scalar, so the entry validation below then throws the
+        # contextual scalar-entry message before any row can be staged.
+        Write-Warning "The Items value of the file 'Items.yaml' of the source folder is a scalar, not a sequence; it is treated as the single entry of the sequence."
+        if ($envelopeValue -isnot [string]) {
+            Write-Warning "The Items value of the file 'Items.yaml' of the source folder is of type '$($envelopeValue.GetType().FullName)' instead of a string; it is coerced to its invariant string form."
+            if ($envelopeValue -is [System.IFormattable]) {
+                $coercedEnvelopeValue = $envelopeValue.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture)
+            }
+            else {
+                $coercedEnvelopeValue = [string]$envelopeValue
+            }
+            $envelopeValue = $coercedEnvelopeValue
+        }
+        $coercedEntries = [System.Collections.Generic.List[object]]::new()
+        $coercedEntries.Add($envelopeValue)
+        $entriesValue = $coercedEntries
     }
 
     # Stage one row per item entry before appending anything, so that
@@ -365,14 +398,14 @@ function Compress-ItemsIntoRagsFile {
         }
 
         # Store the UniqueID value lowercased, mirroring the documented
-        # Unique handling of the expansion (its values are always
-        # coerced to lowercase), so that re-expanding the appended data
-        # keys the entry lowercase again.
-        $normalizedUniqueId = $uniqueId.ToLowerInvariant()
-        if (-not [string]::Equals($normalizedUniqueId, $uniqueId, [System.StringComparison]::Ordinal)) {
-            Write-Warning "The UniqueID of the entry $($entryIndex + 1) of the file 'Items.yaml' of the source folder differs from its lowercase form; it is stored lowercased ('$normalizedUniqueId'), so re-expanding the appended data keys the entry lowercase again."
-            $uniqueId = $normalizedUniqueId
-        }
+        # Unique handling of the expansion (docs/data-mapping.md, Items
+        # section: 'Values are case-insensitive' and 'Always coerced to
+        # lowercase'), so that re-expanding the appended data keys the
+        # entry lowercase again. The lowercasing is silent: a duplicate
+        # of a previously read entry is reported by the duplicate check
+        # below (whose evidence cites the lowercased values), while a
+        # lone mixed-case entry documents its drift on re-expansion.
+        $uniqueId = $uniqueId.ToLowerInvariant()
 
         # Locate and validate the Name value of the entry, which is
         # expected to be the string scalar the expansion wrote. Every

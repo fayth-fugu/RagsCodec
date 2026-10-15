@@ -27,10 +27,22 @@ function Compress-CharacterActionsIntoRagsFile {
     row ID order.
 
     The YAML files of the subfolder are consumed as follows:
+    - A mapping defining keys other than 'Charname' and 'Data' is accepted
+      with one warning naming the unexpected keys; the unexpected keys are
+      ignored.
     - A file whose Charname value is missing, null, empty or whitespace-only
       is skipped in its entirety with a warning, as no meaningful expansion
       target could be derived from it (its rows may therefore not survive a
       compress/expand cycle and its Data values are discarded).
+    - A Charname value which is not a string scalar (a hand-edited unquoted
+      number, for example) is coerced to its invariant string form with a
+      warning; a Charname value which is a sequence or a mapping aborts the
+      whole operation with an exception.
+    - A file whose Charname value repeats the exact value of an earlier
+      file contributes its rows as well, with one warning naming the
+      repeated value (append-only accumulation is the documented caller
+      workflow); names differing only in character case are separate
+      characters and never repeat each other.
     - A file whose Data value is missing, null, empty or whitespace-only,
       or whose Data sequence is empty, contributes no rows and is skipped
       with a warning.
@@ -57,9 +69,13 @@ function Compress-CharacterActionsIntoRagsFile {
     inside a transaction, so a failure while appending leaves no partially
     appended data behind.
 
-    The CharacterActions subfolder is read silently; a missing source folder
-    or subfolder is not an error and compresses nothing. Files of any other
-    extension are skipped with a warning; YAML file names are not
+    The documentation pins the Charname values of the CharacterActions List
+    column as case-sensitive and names each expanded file by the GUID
+    derived from the Charname value (see the GUID file name generation
+    rule of docs/data-mapping.md); both pins are mirrored here. Character
+    names which differ only in character case describe separate
+    characters: their rows are appended under the exact values consumed
+    and re-expand into separate files. YAML file names are not
     interpreted, as the character names and file order are re-derived from
     the Charname mapping values of the contents (the file names used by an
     expansion are silently overwritten). A Charname value longer than the
@@ -70,10 +86,10 @@ function Compress-CharacterActionsIntoRagsFile {
 
     Compressed rows are appended to the CharacterActions table, which is
     expected to receive them (the RAGS Designer workflow of compressing
-    expanded data keeps the convention of fmt:expanded: starting from the
-    template file, or a blank/formatted RAGS file at the caller's
-    discretion). A source folder compressed more than once into the same
-    RAGS file therefore appends the table once per run.
+    expanded data keeps the convention of starting from the template file,
+    or a blank/formatted RAGS file at the caller's discretion). A source
+    folder compressed more than once into the same RAGS file therefore
+    appends the table once per run.
 
     .PARAMETER SourcePath
     Path of the folder to compress the CharacterActions data from.
@@ -118,12 +134,22 @@ function Compress-CharacterActionsIntoRagsFile {
 
     # Collect the files of the subfolder in file name order, so that a given
     # exact character name always receives its rows in a stable and
-    # reproducible order. The expansion writes everything as '.yaml' files;
-    # anything else is skipped with a warning.
+    # reproducible order. The names are sorted ordinally, so that the order
+    # does not depend on the culture of the host; the expansion writes
+    # GUID-named files, whose order is identical under both comparisons.
+    # The expansion writes everything as '.yaml' files; anything else is
+    # skipped with a warning.
     Write-Verbose "Reading the YAML files of '$characterActionsFolder'."
-    $yamlFiles = @(Get-ChildItem -LiteralPath $characterActionsFolder -File |
-        Sort-Object -Property Name)
-    Write-Verbose "Found $($yamlFiles.Count) file(s) in the 'CharacterActions' subfolder."
+    $filesByName = @{}
+    foreach ($foundFile in @(Get-ChildItem -LiteralPath $characterActionsFolder -File)) {
+        $filesByName[$foundFile.Name] = $foundFile
+    }
+    $yamlFileNames = [System.Collections.Generic.List[string]]::new()
+    foreach ($foundFileName in $filesByName.Keys) {
+        $yamlFileNames.Add($foundFileName)
+    }
+    $yamlFileNames.Sort([System.StringComparer]::Ordinal)
+    Write-Verbose "Found $($yamlFileNames.Count) file(s) in the 'CharacterActions' subfolder."
 
     # Stage one row per Data entry before appending anything, so that
     # nothing is written when any source file carries invalid content
@@ -136,7 +162,15 @@ function Compress-CharacterActionsIntoRagsFile {
     $stagedRows = [System.Collections.Generic.List[object]]::new()
     $contributingFileNames = [System.Collections.Generic.List[string]]::new()
 
-    foreach ($file in $yamlFiles) {
+    # The exact (ordinal) Charname values accepted so far, so that a
+    # hand-made file repeating an earlier file's exact value is reported.
+    # Names differing only in character case describe separate characters
+    # (the documentation pins the List column values case-sensitive) and do
+    # not repeat each other.
+    $readCharnameSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+
+    foreach ($yamlFileName in $yamlFileNames) {
+        $file = $filesByName[$yamlFileName]
         if (-not [System.String]::Equals($file.Extension, '.yaml', [System.StringComparison]::OrdinalIgnoreCase)) {
             Write-Warning "Skipping the file '$($file.Name)' of the CharacterActions subfolder: it does not have a '.yaml' extension."
             continue
@@ -174,13 +208,18 @@ function Compress-CharacterActionsIntoRagsFile {
 
         # ConvertFrom-Yaml returns the parsed value of a single document
         # directly (a mapping, a sequence or a scalar, as read), the values
-        # of multiple documents as an object array, and no value at all for
-        # an empty stream. An object array is therefore always the sign of
-        # a multi-document file (a single-document file can never produce
-        # one). Extra documents are ignored with a warning, as the first
-        # document alone determines the appended rows.
+        # of multiple documents as an object array, and nothing at all for
+        # an empty stream (a file carrying only comments included) — a bare
+        # index into that empty array would throw the raw StrictMode index
+        # error instead of the contextual message, so the count is guarded
+        # before the first document is read. Extra documents are ignored
+        # with a warning, as the first document alone determines the
+        # appended rows.
         if ($parsedDocuments.Count -gt 1) {
             Write-Warning "The file '$($file.Name)' of the CharacterActions subfolder defines $($parsedDocuments.Count) YAML documents; only the first document is used and the remaining $($parsedDocuments.Count - 1) document(s) are ignored."
+        }
+        if ($parsedDocuments.Count -lt 1) {
+            throw "Cannot compress the CharacterActions data of the RAGS file: the file '$($file.Name)' of the CharacterActions subfolder carries no YAML document."
         }
 
         $mapping = $parsedDocuments[0]
@@ -201,15 +240,54 @@ function Compress-CharacterActionsIntoRagsFile {
             throw "Cannot compress the CharacterActions data of the RAGS file: the file '$($file.Name)' of the CharacterActions subfolder carries $actualType where a mapping is expected."
         }
 
+        # Resolve the Charname and Data values of the mapping by key, so
+        # that the key comparison does not depend on the dictionary
+        # semantics of the YAML reader: the expansion writes 'Charname' and
+        # 'Data' exactly, and any other key (a case variant included) counts
+        # as unexpected.
+        $charnameValue = $null
+        $dataValue = $null
+        $unexpectedKeys = [System.Collections.Generic.List[string]]::new()
+        foreach ($documentKey in $mapping.Keys) {
+            $documentKeyText = [string]$documentKey
+            if ([string]::Equals($documentKeyText, 'Charname', [System.StringComparison]::Ordinal)) {
+                $charnameValue = $mapping[$documentKey]
+            }
+            elseif ([string]::Equals($documentKeyText, 'Data', [System.StringComparison]::Ordinal)) {
+                $dataValue = $mapping[$documentKey]
+            }
+            else {
+                $unexpectedKeys.Add($documentKeyText)
+            }
+        }
+        if ($unexpectedKeys.Count -gt 0) {
+            $unexpectedKeyText = ($unexpectedKeys | ForEach-Object { "'" + $_ + "'" }) -join ', '
+            Write-Warning "The file '$($file.Name)' of the CharacterActions subfolder defines the unexpected key(s) $unexpectedKeyText; they are ignored."
+        }
+
         # Locate and validate the Charname value of the mapping, which is
-        # expected to be the string scalar the expansion wrote.
-        $charnameValue = $mapping['Charname']
+        # expected to be the string scalar the expansion wrote. A scalar of
+        # any other type (a hand-edited unquoted number, for example) is
+        # coerced to its invariant string form with a warning.
         if ($null -eq $charnameValue) {
             Write-Warning "Skipping the file '$($file.Name)' of the CharacterActions subfolder: the Charname value is missing or null, so no character can be derived for it."
             continue
         }
+
+        if ($charnameValue -is [System.Collections.IList]) {
+            throw "Cannot compress the CharacterActions data of the RAGS file: the Charname value of the file '$($file.Name)' carries a sequence where a scalar value is expected."
+        }
+        if ($charnameValue -is [System.Collections.IDictionary]) {
+            throw "Cannot compress the CharacterActions data of the RAGS file: the Charname value of the file '$($file.Name)' carries a mapping where a scalar value is expected."
+        }
         if ($charnameValue -isnot [string]) {
-            throw "Cannot compress the CharacterActions data of the RAGS file: the Charname value of the file '$($file.Name)' is of type '$($charnameValue.GetType().FullName)' instead of a string."
+            Write-Warning "The Charname value of the file '$($file.Name)' is of type '$($charnameValue.GetType().FullName)' instead of a string; it is coerced to its invariant string form."
+            if ($charnameValue -is [System.IFormattable]) {
+                $charnameValue = $charnameValue.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture)
+            }
+            else {
+                $charnameValue = [string]$charnameValue
+            }
         }
         if ([string]::IsNullOrWhiteSpace($charnameValue)) {
             Write-Warning "Skipping the file '$($file.Name)' of the CharacterActions subfolder: the Charname value is empty, so no character can be derived for it."
@@ -217,19 +295,32 @@ function Compress-CharacterActionsIntoRagsFile {
         }
 
         # Truncate the Charname value to the length of the table column, as
-        # a longer value could not be stored.
+        # a longer value could not be stored. The truncation runs before
+        # the duplicate check below, so that the stored value is what it
+        # validates; two over-long values which become equal only by their
+        # truncation repeat each other like any other set of exact
+        # duplicates.
         $charname = $charnameValue
         if ($charname.Length -gt 250) {
             Write-Warning "The Charname value of the file '$($file.Name)' is $($charname.Length) characters long, which exceeds the 250 characters of the table column; the value is truncated. Note that re-expanding the appended data then derives a different file name from the truncated value."
             $charname = $charname.Substring(0, 250)
         }
 
-        # Locate and validate the Data value of the mapping, which is a
+        # A file whose exact Charname value was already read contributes
+        # its rows as well (append-only accumulation), with one warning;
+        # the expander writes at most one file per exact name, so this can
+        # only be hand-made content. The value joins the set the moment a
+        # file's Charname is accepted, so a duplicate warns even when the
+        # earlier file contributed no rows.
+        if (-not $readCharnameSet.Add($charname)) {
+            Write-Warning "The file '$($file.Name)' of the CharacterActions subfolder repeats the Charname value of a previously read file; the rows of both files are appended under the same character '$charname'."
+        }
+
+        # The Data value of the mapping was resolved above; it is a
         # sequence of pretty-printed XML action expansions. A scalar value
         # is accepted as the single entry of the sequence with a warning,
         # as single-entry sequences are commonly written without their
         # leading sequence dash.
-        $dataValue = $mapping['Data']
         if ($null -eq $dataValue) {
             Write-Warning "Skipping the file '$($file.Name)' of character '$charname': the Data value is missing or null, so no data can be derived from it."
             continue

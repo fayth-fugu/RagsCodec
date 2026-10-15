@@ -47,26 +47,37 @@ function Compress-ItemActionsIntoRagsFile {
     - An ItemID value longer than the 250 characters of the table column is
       truncated with a warning; note that re-expanding the appended data
       then derives a different file name from the truncated value.
+    - The List-column values of the ItemActions table are documented as
+      case-insensitive and always coerced to lowercase ('Values are
+      case-insensitive' / 'Always coerced to lowercase' in the ItemActions
+      section of docs/data-mapping.md), so every accepted ItemID value is
+      lowercased with ToLowerInvariant (after its truncation, before the
+      file-name and case-mate checks), and every appended row carries the
+      lowercased form (the re-expansion of the appended data lowercases its
+      read values anyway, so these rows re-expand with their ItemID value
+      unchanged).
     - The file names of the subfolder are never interpreted: the ItemID
       value of the contents is the truth, so the file name an expansion
       originally wrote is silently irrelevant. An ItemID value which cannot
       form a valid Windows file name (because it contains characters that
       are invalid in file names, ends with a dot or a space, or names a
       reserved device such as CON, NUL or COM1) still contributes its rows,
-      since the value itself is stored as-is and no file is created from it
-      here; a warning reports that re-expanding the appended data skips
-      these rows as documented (the warning fires only for files which
-      actually contribute rows).
+      since the value itself is stored lowercased and no file is created
+      from it here; a warning reports that re-expanding the appended data
+      skips these rows as documented (the warning fires when the ItemID
+      value is accepted, before the file's Data value is validated).
     - ItemID values of two files which differ only in character case would
       re-expand into one file, since the expansion groups ItemID values
-      case-insensitively; such files are therefore merged - the casing read
-      first (of the file whose name sorts first) wins for the appended rows,
-      and every later case mate is reported with one warning. Case mates
-      which do not contribute rows (their Data value is missing, empty or
-      yields only empty entries) are reported through their skip warnings
-      only, as they merge nothing. ItemID values which are exactly equal in
-      other files are appended without a warning, as append-only
-      accumulation is the documented caller workflow.
+      case-insensitively; such files are therefore merged - every file
+      whose raw ItemID value differs from the first-read raw value of its
+      set of case mates (the file whose name sorts first reads first) is
+      reported with one warning which cites the lowercased value on both
+      sides, and the appended rows of all such files carry one common
+      lowercased ItemID value. The warning fires when the ItemID value is
+      accepted, so a case mate whose Data value is skipped entirely is
+      merge-reported in addition to its skip warning. ItemID values which
+      are exactly equal in other files are appended without a warning, as
+      append-only accumulation is the documented caller workflow.
     - A file whose Data value is missing, null, empty or whitespace-only,
       or whose Data sequence is empty, contributes no rows and is skipped
       with a warning.
@@ -136,14 +147,23 @@ function Compress-ItemActionsIntoRagsFile {
     Write-Verbose "Compressing the ItemActions data of the RAGS file from '$itemActionsFolder'."
 
     # Collect the files of the subfolder in file name order, so that a given
-    # exact item always receives its rows in a stable and reproducible
-    # order, and so that the casing of a set of case-mate items is decided
-    # by the file whose name sorts first. The expansion writes everything as
-    # '.yaml' files; anything else is skipped with a warning.
+    # item always receives its rows in a stable and reproducible order, and
+    # so that the first-read raw value of a set of case-mate items is
+    # decided by the file whose name sorts first. The names are sorted
+    # ordinally, so that the order does not depend on the culture of the
+    # host. The expansion writes everything as '.yaml' files; anything else
+    # is skipped with a warning.
     Write-Verbose "Reading the YAML files of '$itemActionsFolder'."
-    $yamlFiles = @(Get-ChildItem -LiteralPath $itemActionsFolder -File |
-        Sort-Object -Property Name)
-    Write-Verbose "Found $($yamlFiles.Count) file(s) in the 'ItemActions' subfolder."
+    $filesByName = @{}
+    foreach ($foundFile in @(Get-ChildItem -LiteralPath $itemActionsFolder -File)) {
+        $filesByName[$foundFile.Name] = $foundFile
+    }
+    $yamlFileNames = [System.Collections.Generic.List[string]]::new()
+    foreach ($foundFileName in $filesByName.Keys) {
+        $yamlFileNames.Add($foundFileName)
+    }
+    $yamlFileNames.Sort([System.StringComparer]::Ordinal)
+    Write-Verbose "Found $($yamlFileNames.Count) file(s) in the 'ItemActions' subfolder."
 
     # Characters that are invalid in file names on the current file system.
     # The array includes control characters (tab and line-break characters
@@ -161,13 +181,17 @@ function Compress-ItemActionsIntoRagsFile {
     $stagedRows = [System.Collections.Generic.List[object]]::new()
     $contributingFileNames = [System.Collections.Generic.List[string]]::new()
 
-    # The ItemID value groups are tracked as a list of the casings read
-    # first, so that ItemID values which differ only in character case can
-    # merge under the first-read casing (the expansion of the appended data
-    # writes such rows back into one file).
+    # The ItemID value groups are tracked as parallel lists keyed by the
+    # canonical lowercased value: the group names are the ItemID values of
+    # the appended rows, and the raw names keep the pre-lowercasing value
+    # of the file which opened the group, so that a later case mate whose
+    # raw value differs from it is merge-reported (the expansion of the
+    # appended data writes such rows back into one file).
     $groupNames = [System.Collections.Generic.List[string]]::new()
+    $groupRawNames = [System.Collections.Generic.List[string]]::new()
 
-    foreach ($file in $yamlFiles) {
+    foreach ($yamlFileName in $yamlFileNames) {
+        $file = $filesByName[$yamlFileName]
         if (-not [System.String]::Equals($file.Extension, '.yaml', [System.StringComparison]::OrdinalIgnoreCase)) {
             Write-Warning "Skipping the file '$($file.Name)' of the ItemActions subfolder: it does not have a '.yaml' extension."
             continue
@@ -274,22 +298,34 @@ function Compress-ItemActionsIntoRagsFile {
         # Truncate the ItemID value to the length of the table column, as a
         # longer value could not be stored. The value is truncated before
         # the file-name and case-mate checks below, so that the stored value
-        # is what they validate.
+        # is what they validate (the warning above cites the pre-truncation
+        # length, so the value is only cut afterwards).
         $itemId = $itemIdValue
         if ($itemId.Length -gt 250) {
             Write-Warning "The ItemID value of the file '$($file.Name)' is $($itemId.Length) characters long, which exceeds the 250 characters of the table column; the value is truncated. Note that re-expanding the appended data then derives a different file name from the truncated value."
             $itemId = $itemId.Substring(0, 250)
         }
 
+        # The List-column values of the ItemActions table are documented as
+        # case-insensitive and always coerced to lowercase ('Values are
+        # case-insensitive' / 'Always coerced to lowercase' in the
+        # ItemActions section of docs/data-mapping.md), so the truncated raw
+        # value is lowered with ToLowerInvariant (the invariant result is
+        # independent of the current culture). Everything below - the
+        # file-name checks, the case-mate grouping and the appended rows -
+        # works with and cites this lowercased form; the raw value is kept
+        # only for the merge reporting of the case-mate grouping. The
+        # expansion of the appended data lowercases its read values anyway,
+        # so the lowercased rows re-expand with their ItemID value
+        # unchanged.
+        $itemIdRaw = $itemId
+        $itemId = $itemIdRaw.ToLowerInvariant()
+
         # An ItemID value which cannot form a valid file name still
         # contributes its rows, as the file name of an expansion is never
-        # interpreted here; the round-trip loss is reported below (the
-        # warning is deferred until the file has actually staged rows).
-        # The deferred warnings of a file (a file-name round-trip loss and a
-        # case-mate merge) are kept in one list which both check phases
-        # fill, so that a contributing file reports all of its deferred
-        # warnings.
-        $pendingWarnings = [System.Collections.Generic.List[string]]::new()
+        # interpreted here; the round-trip loss is reported as soon as the
+        # value is accepted (all three checks are case-agnostic, so running
+        # them on the lowercased value changes no outcome).
         $fileNameProblem = $null
         if (-1 -lt $itemId.IndexOfAny($invalidFileNameChars)) {
             $fileNameProblem = 'it contains a character that is invalid in file names'
@@ -301,17 +337,22 @@ function Compress-ItemActionsIntoRagsFile {
             $fileNameProblem = 'it names a reserved device, which cannot be used as a file name'
         }
         if ($null -ne $fileNameProblem) {
-            $pendingWarnings.Add("The ItemID value of the file '$($file.Name)' of item '$itemId' cannot form a valid file name because $fileNameProblem; the rows are appended with this ItemID value, but re-expanding the appended data skips these rows as documented.")
+            Write-Warning "The ItemID value of the file '$($file.Name)' of item '$itemId' cannot form a valid file name because $fileNameProblem; the rows are appended with this ItemID value, but re-expanding the appended data skips these rows as documented."
         }
 
-        # Locate or create the case-insensitive group of the item, whose
-        # name keeps the casing read first. A file whose ItemID differs from
-        # an earlier file's value only in character case merges into the
-        # group; its warning is deferred until the file has actually staged
-        # rows, as it describes the casing of appended data.
+        # Locate or create the group of the item. The lowercased value is
+        # canonical, so the lookup compares ordinal against it (a
+        # case-insensitive comparison would change no outcome). The
+        # first-read raw value is kept per group, and a file whose raw value
+        # differs from it is merged with a warning which cites the
+        # lowercased value on both sides; the first-read file of a case mate
+        # set and files repeating its raw value merge without a warning. The
+        # warning fires as soon as the value is accepted - like every other
+        # ItemID-value warning, before the Data value of the file is
+        # validated.
         $groupIndex = -1
         for ($candidateIndex = 0; $candidateIndex -lt $groupNames.Count; $candidateIndex++) {
-            if ([string]::Equals($groupNames[$candidateIndex], $itemId, [System.StringComparison]::OrdinalIgnoreCase)) {
+            if ([string]::Equals($groupNames[$candidateIndex], $itemId, [System.StringComparison]::Ordinal)) {
                 $groupIndex = $candidateIndex
                 break
             }
@@ -319,13 +360,14 @@ function Compress-ItemActionsIntoRagsFile {
         if ($groupIndex -lt 0) {
             $groupIndex = $groupNames.Count
             $groupNames.Add($itemId)
+            $groupRawNames.Add($itemIdRaw)
         }
-        elseif (-not [string]::Equals($groupNames[$groupIndex], $itemId, [System.StringComparison]::Ordinal)) {
-            $pendingWarnings.Add("Merging the rows of the file '$($file.Name)' of item '$itemId' into the rows of item '$($groupNames[$groupIndex])': the ItemID values differ only in character case.")
+        elseif (-not [string]::Equals($groupRawNames[$groupIndex], $itemIdRaw, [System.StringComparison]::Ordinal)) {
+            Write-Warning "Merging the rows of the file '$($file.Name)' of item '$itemId' into the rows of item '$($groupNames[$groupIndex])': the raw ItemID value differs only in character case and is merged into the lowercased rows."
         }
 
         # Every appended row of the file carries the group's ItemID value
-        # (the first-read casing of its set of case mates).
+        # (the lowercased form common to its set of case mates).
         $stagedItemId = $groupNames[$groupIndex]
 
         # Locate and validate the Data value of the mapping, which is a
@@ -398,14 +440,7 @@ function Compress-ItemActionsIntoRagsFile {
             })
         }
 
-        # The deferred warnings of the file (a file-name round-trip loss and
-        # a case-mate merge) fire only when it actually contributed rows: an
-        # ItemID value whose data was skipped entirely loses nothing at
-        # re-expansion.
         if ($stagedRows.Count -gt $fileRowsBefore) {
-            foreach ($pendingWarning in $pendingWarnings) {
-                Write-Warning $pendingWarning
-            }
             $contributingFileNames.Add($file.Name)
         }
     }

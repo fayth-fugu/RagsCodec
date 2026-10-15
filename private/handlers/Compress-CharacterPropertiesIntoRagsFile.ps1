@@ -19,12 +19,19 @@ function Compress-CharacterPropertiesIntoRagsFile {
     a Charname value to the Name key, whose value is a sequence of property
     mappings holding the property Name and its Value. One table row is
     appended per property (the Identity column value is supplied by the
-    database), replicating the row order of the original expansion: entries
-    keep their YAML sequence order and the properties of every entry keep
-    their YAML sequence order, so re-expanding the file restores the
-    entries and their properties in ascending row ID order.
+    database), replicating the row order of the original expansion — the
+    table is sorted first by Charname, then by Name and then by row ID,
+    as documented for the 'CharacterProperties' table in
+    docs/data-mapping.md: entries keep their YAML sequence order and the
+    properties of every entry keep their YAML sequence order, so
+    re-expanding the file restores the entries and their properties in
+    ascending row ID order.
 
     The 'CharacterProperties.yaml' file is consumed as follows:
+    - A file from which the YAML parser can produce no document at all (a
+      file which passes the empty check but carries comments only) is
+      reported like a missing document and aborts the whole operation
+      with an exception ('carries no YAML document').
     - A file which defines more than one YAML document is consumed from
       its first document only, with a warning naming the file and the
       number of ignored extra documents.
@@ -44,20 +51,27 @@ function Compress-CharacterPropertiesIntoRagsFile {
       warning; a value of any other type aborts the whole operation with
       an exception.
     - Entries which are null are skipped with a warning. An entry which
-      is not a mapping, an entry whose Charname value is not a string, an
-      entry whose Name value is neither a scalar nor a sequence, a
-      property which is not a mapping, a property whose Name value is not
-      a string, and a property Value which is a sequence or a mapping
-      abort the whole operation with an exception, as no meaningful row
-      can be derived from them.
+      is not a mapping, an entry whose Charname value is a sequence or a
+      mapping, an entry whose Name value is neither a scalar nor a
+      sequence, a property which is not a mapping, a property whose Name
+      value is a sequence or a mapping, and a property Value which is a
+      sequence or a mapping abort the whole operation with an exception,
+      as no meaningful row can be derived from them.
     - An entry whose Charname value is missing, null, empty or
       whitespace-only is skipped in its entirety with a warning, as no
       meaningful expansion target could be derived from it. A Charname
-      value longer than the 250 characters of the table column is
-      truncated with a warning; note that re-expanding the appended data
-      then derives a different entry layout from the truncated value, so
-      such an entry may not survive a compress/expand cycle byte-exactly
-      either.
+      value which is a scalar but not a string (a hand-edited unquoted
+      number, for example) is coerced to its string form with a warning;
+      the string form of format-sensitive values is derived with the
+      invariant culture, so such a value round-trips through hosts of
+      different cultures. Entries are grouped by the exact Charname
+      value case-sensitively, as documented for the 'CharacterProperties'
+      table in docs/data-mapping.md ('Values are case-sensitive'). A
+      Charname value longer than the 250 characters of the table column
+      is truncated with a warning; note that re-expanding the appended
+      data then derives a different entry layout from the truncated
+      value, so such an entry may not survive a compress/expand cycle
+      byte-exactly either.
     - An entry which repeats the exact Charname value of a previously
       read entry is warned about; the properties of all such entries are
       appended under the same character, as one character cannot carry
@@ -70,14 +84,19 @@ function Compress-CharacterPropertiesIntoRagsFile {
       with a warning.
     - Properties which are null, or whose Name value is missing, null,
       empty or whitespace-only, are skipped with a warning. A property
-      Name value longer than the 250 characters of the table column is
-      truncated with a warning, which may make two distinct property
-      names indistinguishable.
+      Name value which is a scalar but not a string is coerced to its
+      invariant string form with a warning, as the entry Charname value
+      above. A property Name value longer than the 250 characters of the
+      table column is truncated with a warning, which may make two
+      distinct property names indistinguishable.
     - A property which repeats the exact property name of a previously
       read property of the same character is skipped with a warning (the
       value of the first read property wins, mirroring the Unique
-      soft-validation of the expansion; the warning reports the value of
-      the ignored property).
+      soft-validation of the expansion documented for the
+      'CharacterProperties' table in docs/data-mapping.md — for the same
+      Charname value, only the Value of the first row is read, and the
+      Names are case-sensitive; the warning reports the value of the
+      ignored property).
     - A property Value which is missing or null is stored as a database
       null without a warning, as the expansion emits a YAML null for a
       null Value column. A property Value which is a scalar but not a
@@ -86,7 +105,13 @@ function Compress-CharacterPropertiesIntoRagsFile {
       values is derived with the invariant culture, so such a value
       round-trips through hosts of different cultures (except for date
       values, which are written in their invariant general form rather
-      than as the ISO 8601 string an expansion extracts).
+      than as the ISO 8601 string an expansion extracts). Property
+      values are normalized to line-feed line breaks before they are
+      staged, because the expansion emits every multi-line value as a
+      YAML literal block scalar whose line breaks are read back as line
+      feeds; carriage returns in hand-edited files would otherwise
+      re-expand into different values. The staged value never carries a
+      line break other than a line feed.
     - Keys of an entry other than Charname and Name, and keys of a
       property other than Name and Value, are ignored with a warning.
 
@@ -178,9 +203,14 @@ function Compress-CharacterPropertiesIntoRagsFile {
     # ConvertFrom-Yaml returns the parsed value of a single document
     # directly (a mapping, a sequence or a scalar, as read), the values of
     # multiple documents as an object array, and no value at all for an
-    # empty stream. A missing value after the parse is therefore reported
-    # like a missing document.
-    $rootDocument = $parsedDocuments[0]
+    # empty or comment-only stream. A missing value after the parse is
+    # therefore reported like a missing document; the read below is
+    # guarded, because a bare index would throw a raw strict-mode error
+    # for an empty document array instead of that report.
+    $rootDocument = $null
+    if ($parsedDocuments.Count -gt 0) {
+        $rootDocument = $parsedDocuments[0]
+    }
     if ($null -eq $rootDocument) {
         throw "Cannot compress the CharacterProperties data of the RAGS file: the file 'CharacterProperties.yaml' of the source folder carries no YAML document."
     }
@@ -291,23 +321,43 @@ function Compress-CharacterPropertiesIntoRagsFile {
         }
 
         # Locate and validate the Charname value of the entry, which is
-        # expected to be the string scalar the expansion wrote.
+        # expected to be the string scalar the expansion wrote: entries
+        # are grouped by the exact Charname value case-sensitively, as
+        # documented for the 'CharacterProperties' table in
+        # docs/data-mapping.md ('Values are case-sensitive'). A non-string
+        # scalar is coerced to its invariant string form with a warning
+        # (a hand-edited unquoted number, for example), while a sequence
+        # or a mapping aborts the whole operation with an exception, as
+        # no meaningful character can be derived from it.
         $entryCharname = $entryValue['Charname']
         if ($null -eq $entryCharname) {
             Write-Warning "Skipping the entry $($entryIndex + 1) of the file 'CharacterProperties.yaml' of the source folder: the Charname value is missing or null, so no character can be derived for it."
             continue
         }
-        if ($entryCharname -isnot [string]) {
-            throw "Cannot compress the CharacterProperties data of the RAGS file: the Charname value of the entry $($entryIndex + 1) of the file 'CharacterProperties.yaml' of the source folder is of type '$($entryCharname.GetType().FullName)' instead of a string."
+        $charname = $entryCharname
+        if ($charname -isnot [string]) {
+            if ($charname -is [System.Collections.IList]) {
+                throw "Cannot compress the CharacterProperties data of the RAGS file: the Charname value of the entry $($entryIndex + 1) of the file 'CharacterProperties.yaml' of the source folder carries a sequence where a scalar value is expected."
+            }
+            elseif ($charname -is [System.Collections.IDictionary]) {
+                throw "Cannot compress the CharacterProperties data of the RAGS file: the Charname value of the entry $($entryIndex + 1) of the file 'CharacterProperties.yaml' of the source folder carries a mapping where a scalar value is expected."
+            }
+
+            Write-Warning "The Charname value of the entry $($entryIndex + 1) of the file 'CharacterProperties.yaml' of the source folder is of type '$($charname.GetType().FullName)' instead of a string; it is coerced to its invariant string form."
+            if ($charname -is [System.IFormattable]) {
+                $charname = $charname.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture)
+            }
+            else {
+                $charname = [string]$charname
+            }
         }
-        if ([string]::IsNullOrWhiteSpace($entryCharname)) {
+        if ([string]::IsNullOrWhiteSpace($charname)) {
             Write-Warning "Skipping the entry $($entryIndex + 1) of the file 'CharacterProperties.yaml' of the source folder: the Charname value is empty, so no character can be derived for it."
             continue
         }
 
         # Truncate the Charname value to the length of the table column,
         # as a longer value could not be stored.
-        $charname = $entryCharname
         if ($charname.Length -gt 250) {
             Write-Warning "The Charname value of the entry $($entryIndex + 1) of the file 'CharacterProperties.yaml' of the source folder is $($charname.Length) characters long, which exceeds the 250 characters of the table column; the value is truncated. Note that re-expanding the appended data then derives a different entry layout from the truncated value."
             $charname = $charname.Substring(0, 250)
@@ -398,23 +448,39 @@ function Compress-CharacterPropertiesIntoRagsFile {
             }
 
             # Locate and validate the Name value of the property, which is
-            # expected to be the string scalar the expansion wrote.
-            $propertyNameValue = $propertyValue['Name']
-            if ($null -eq $propertyNameValue) {
+            # expected to be the string scalar the expansion wrote. A
+            # non-string scalar is coerced to its invariant string form
+            # with a warning, as the entry Charname value above, while a
+            # sequence or a mapping aborts the whole operation with an
+            # exception, as no meaningful property can be derived from it.
+            $propertyName = $propertyValue['Name']
+            if ($null -eq $propertyName) {
                 Write-Warning "Skipping the property $($propertyIndex + 1) of the entry $($entryIndex + 1) for character '$charname': the Name value is missing or null, so no property can be derived from it."
                 continue
             }
-            if ($propertyNameValue -isnot [string]) {
-                throw "Cannot compress the CharacterProperties data of the RAGS file: the Name value of the property $($propertyIndex + 1) of the entry $($entryIndex + 1) for character '$charname' is of type '$($propertyNameValue.GetType().FullName)' instead of a string."
+            if ($propertyName -isnot [string]) {
+                if ($propertyName -is [System.Collections.IList]) {
+                    throw "Cannot compress the CharacterProperties data of the RAGS file: the Name of the property $($propertyIndex + 1) of the entry $($entryIndex + 1) for character '$charname' carries a sequence where a scalar value is expected."
+                }
+                elseif ($propertyName -is [System.Collections.IDictionary]) {
+                    throw "Cannot compress the CharacterProperties data of the RAGS file: the Name of the property $($propertyIndex + 1) of the entry $($entryIndex + 1) for character '$charname' carries a mapping where a scalar value is expected."
+                }
+
+                Write-Warning "The Name of the property $($propertyIndex + 1) of the entry $($entryIndex + 1) for character '$charname' is of type '$($propertyName.GetType().FullName)' instead of a string; it is coerced to its invariant string form."
+                if ($propertyName -is [System.IFormattable]) {
+                    $propertyName = $propertyName.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture)
+                }
+                else {
+                    $propertyName = [string]$propertyName
+                }
             }
-            if ([string]::IsNullOrWhiteSpace($propertyNameValue)) {
+            if ([string]::IsNullOrWhiteSpace($propertyName)) {
                 Write-Warning "Skipping the property $($propertyIndex + 1) of the entry $($entryIndex + 1) for character '$charname': the Name value is empty, so no property can be derived from it."
                 continue
             }
 
             # Truncate the property Name value to the length of the table
             # column, as a longer value could not be stored.
-            $propertyName = $propertyNameValue
             if ($propertyName.Length -gt 250) {
                 Write-Warning "The Name value of the property $($propertyIndex + 1) of the entry $($entryIndex + 1) for character '$charname' is $($propertyName.Length) characters long, which exceeds the 250 characters of the table column; the value is truncated. Note that re-expanding the appended data then derives a different property from the truncated value."
                 $propertyName = $propertyName.Substring(0, 250)
@@ -443,7 +509,9 @@ function Compress-CharacterPropertiesIntoRagsFile {
             # values therefore round-trip through hosts of different
             # cultures). The value is derived BEFORE the duplicate check
             # below, so that the warning of the check reports the value of
-            # the ignored property.
+            # the ignored property; the line-break normalization below
+            # also runs before the check, so the reported value is the
+            # normalized value of the ignored property.
             $propertyDataValue = $propertyValue['Value']
             $storableValue = $null
             if ($null -ne $propertyDataValue) {
@@ -465,6 +533,17 @@ function Compress-CharacterPropertiesIntoRagsFile {
                         $storableValue = [string]$propertyDataValue
                     }
                 }
+
+                # A YAML literal block scalar normalizes line breaks to
+                # line-feed characters when the written YAML is read back
+                # (the expansion emits every multi-line value as one), so
+                # carriage returns are normalized away before the value is
+                # staged, to keep the round-trip byte-exact. The
+                # normalized value is assigned to a local first: operator
+                # expressions passed directly as method arguments are
+                # mis-tokenized as additional arguments on both hosts.
+                $normalizedValue = ([string]$storableValue) -replace '\r\n?', "`n"
+                $storableValue = $normalizedValue
             }
 
             # Soft-validate the Unique Name column: the property Name of a

@@ -48,12 +48,21 @@ function Compress-GameDataIntoRagsFile {
       limit to truncate to; the expansion normalizes line breaks on both
       sides of the round-trip.
     - A bit column value (HideMainPicDisplay, UseInlineImages, HidePortrait,
-      RepeatbgMusic, PasswordProtected, NotificationsOff) which is missing
-      or null is stored as false without a warning, as the expansion emits
-      a YAML false for a null bit column. A bit column value which is a
-      boolean is stored as read; an integer scalar of 1 or 0 is accepted
-      with a warning; a value of any other type or content aborts the
-      whole operation with an exception.
+      RepeatbgMusic, PasswordProtected) which is missing or null is
+      stored as false without a warning, as the YAML rules of the data
+      mapping document: the value 0 and null of a bit column map to
+      false. A bit column value which is a boolean is stored as read;
+      an integer scalar of 1 or 0 is accepted with a warning; a value
+      of any other type or content aborts the whole operation with an
+      exception.
+    - NotificationsOff is not null in its table column, so an expansion
+      can never emit a YAML null for it and a missing or null value is
+      hand-edited file content; such a value is stored as the false the
+      not-null table column documents as its default value, with a
+      warning (like the sort-order columns below). A boolean value is
+      stored as read; an integer scalar of 1 or 0 is accepted with a
+      warning; a value of any other type or content aborts the whole
+      operation with an exception.
     - A SortOrderRoom, SortOrderCharacters or SortOrderInventory value
       which is missing or null is stored as the 0 its not-null table
       column documents as its default value, with a warning (an expansion
@@ -65,9 +74,10 @@ function Compress-GameDataIntoRagsFile {
       such as the one the expansion writes for an empty GameData table)
       still contributes one row of database-null text values, false bit
       values and the documented 0 sort orders. Note that re-expanding
-      such a row then yields the all-null mapping an expansion writes for
-      an empty table; the false bit values and the 0 sort orders cannot
-      be distinguished from their null counterparts after the round-trip.
+      such a row then yields the defaults the row was stored with (the
+      false bit values, the 0 sort orders), never the all-null mapping
+      again: the false bit values and the 0 sort orders cannot be
+      distinguished from their null counterparts after the round-trip.
 
     The 'GameData.yaml' file is read, validated and fully staged before
     the row is appended, so the table remains unchanged when the source
@@ -82,12 +92,15 @@ function Compress-GameDataIntoRagsFile {
     to receive them (the RAGS Designer workflow of compressing expanded
     data keeps the convention of starting from the template file, or from
     a blank/formatted RAGS file at the caller's discretion). The GameData
-    table carries a single row in a well-formed RAGS file, and the
-    expansion reads only the first row the database returns: a source
-    folder appended to a RAGS file which already carries GameData rows
-    therefore leaves the appended row readable only where the engine
-    returns it ahead of them, and a source folder compressed more than
-    once into the same RAGS file appends the table once per run.
+    table is documented in docs/data-mapping.md to hold only a single
+    row, so the expansion reads only the first row the database returns
+    and shows 'a warning containing the values of subsequent ignored
+    duplicate rows': a source folder appended to a RAGS file which
+    already carries GameData rows therefore leaves the appended row
+    readable only where the engine returns it ahead of them (every row
+    read ahead is then reported as ignored), and a source folder
+    compressed more than once into the same RAGS file appends the table
+    once per run.
 
     .PARAMETER SourcePath
     Path of the folder to compress the GameData data from.
@@ -165,9 +178,15 @@ function Compress-GameDataIntoRagsFile {
     # ConvertFrom-Yaml returns the parsed value of a single document
     # directly (a mapping, a sequence or a scalar, as read), the values of
     # multiple documents as an object array, and no value at all for an
-    # empty stream. A missing value after the parse is therefore reported
-    # like a missing document.
-    $rootDocument = $parsedDocuments[0]
+    # empty stream — including a stream which carries comments only, which
+    # yields nothing at all. A missing value after the parse is therefore
+    # reported like a missing document; the count is guarded first, so
+    # that a comment-only stream reaches the contextual throw below
+    # instead of a raw array-index error under strict mode.
+    $rootDocument = $null
+    if ($parsedDocuments.Count -gt 0) {
+        $rootDocument = $parsedDocuments[0]
+    }
     if ($null -eq $rootDocument) {
         throw "Cannot compress the GameData data of the RAGS file: the file 'GameData.yaml' of the source folder carries no YAML document."
     }
@@ -638,12 +657,21 @@ function Compress-GameDataIntoRagsFile {
         }
     }
 
+    # NotificationsOff is not null in its table column, so an expansion
+    # can never emit a YAML null for it (there is no row whose value
+    # could be read as null); a missing or null value here is hand-edited
+    # file content and is stored as the documented false, with a warning
+    # (like the three sort-order columns below, whose columns are also
+    # not null in the database).
     $notificationsOffValue = $rootDocument['NotificationsOff']
     $notificationsOff = $false
-    if ($notificationsOffValue -is [bool]) {
+    if ($null -eq $notificationsOffValue) {
+        Write-Warning "The NotificationsOff of the file 'GameData.yaml' of the source folder is missing or null; it is stored as the false the not-null table column documents as its default value."
+    }
+    elseif ($notificationsOffValue -is [bool]) {
         $notificationsOff = $notificationsOffValue
     }
-    elseif ($null -ne $notificationsOffValue) {
+    else {
         if (($notificationsOffValue -is [int]) -or ($notificationsOffValue -is [long])) {
             if ($notificationsOffValue -eq 1) {
                 Write-Warning "The NotificationsOff of the file 'GameData.yaml' of the source folder is the integer 1 instead of a boolean; it is stored as the boolean true."
