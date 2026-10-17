@@ -81,11 +81,13 @@ function Compress-ItemLayeredZoneLevelsIntoRagsFile {
       sequence entries which are empty or whitespace-only are skipped with
       a warning, as the expansion never reads a row whose Data value is
       empty.
-    - Data values are normalized to line-feed line breaks before they are
-      staged, because the expansion emits every string with line-feed
-      breaks (a literal block scalar normalizes its line breaks on read);
-      carriage returns in hand-edited files would otherwise re-expand into
-      different values. The truncation below measures the normalized
+    - Data values are stored as read: no line-ending normalization is
+      applied (the verbatim contract of the expansion family — note
+      that a multi-line value re-emits through a YAML literal block,
+      whose re-read normalizes the written breaks to line feeds; a
+      carriage return which arrives in the parsed value, from a
+      double-quoted '\r' escape in a hand-edited file for example, is
+      staged verbatim). The truncation below measures the as-parsed
       values.
     - An ItemID or Data value longer than the 250 characters of its table
       column is truncated with a warning; note that re-expanding the
@@ -295,7 +297,7 @@ function Compress-ItemLayeredZoneLevelsIntoRagsFile {
     # Stage one row per Data sequence entry before appending anything, so
     # that nothing is written when the source file carries invalid content
     # (all-or-nothing, like every file of the expansion). Every staged
-    # value carries the item id, the normalized Data value and the 1-based
+    # value carries the item id, the as-parsed Data value and the 1-based
     # entry and Data entry indices which produced it, for the messages of
     # the append phase. The validation of every entry is performed inline
     # below, so that the file is fully validated (and every failure
@@ -507,31 +509,29 @@ function Compress-ItemLayeredZoneLevelsIntoRagsFile {
             }
 
             # A YAML literal block scalar normalizes line breaks to
-            # line-feed characters when the written YAML is read back, so
-            # carriage returns are normalized away beforehand to keep the
-            # round-trip byte-exact. The normalized value is assigned to a
-            # local first: operator expressions passed directly as method
-            # arguments are mis-tokenized as additional arguments on both
-            # hosts.
-            $normalizedData = ([string]$dataValue) -replace '\r\n?', "`n"
+            # line-feed characters when the written YAML is read back —
+            # a parsed carriage return from a double-quoted escape
+            # arrives as-is and is staged verbatim, like the expansion
+            # family's verbatim contract.
+            $dataValue = [string]$dataValue
 
-            if ([string]::IsNullOrWhiteSpace($normalizedData)) {
+            if ([string]::IsNullOrWhiteSpace($dataValue)) {
                 Write-Warning "Skipping the Data entry $($dataIndex + 1) of the entry $($entryIndex + 1) of the file 'ItemLayeredZoneLevels.yaml' of the source folder for item '$stagedItemId': the Data value is empty."
                 continue
             }
 
             # Truncate the Data value to the length of the table column,
             # as a longer value could not be stored. The truncation
-            # measures the normalized value (see above), as the stored
-            # value is the normalized one.
-            if ($normalizedData.Length -gt 250) {
-                Write-Warning "The Data entry $($dataIndex + 1) of the entry $($entryIndex + 1) of the file 'ItemLayeredZoneLevels.yaml' of the source folder for item '$stagedItemId' is $($normalizedData.Length) characters long, which exceeds the 250 characters of the table column; the value is truncated. Note that re-expanding the appended data then derives a different value from the truncated one."
-                $normalizedData = $normalizedData.Substring(0, 250)
+            # measures the as-parsed value (see above), as the stored
+            # value is that value verbatim.
+            if ($dataValue.Length -gt 250) {
+                Write-Warning "The Data entry $($dataIndex + 1) of the entry $($entryIndex + 1) of the file 'ItemLayeredZoneLevels.yaml' of the source folder for item '$stagedItemId' is $($dataValue.Length) characters long, which exceeds the 250 characters of the table column; the value is truncated. Note that re-expanding the appended data then derives a different value from the truncated one."
+                $dataValue = $dataValue.Substring(0, 250)
             }
 
             $stagedRows.Add([pscustomobject]@{
                 ItemID     = $stagedItemId
-                Data       = $normalizedData
+                Data       = $dataValue
                 EntryIndex = $entryIndex + 1
                 DataIndex  = $dataIndex + 1
             })

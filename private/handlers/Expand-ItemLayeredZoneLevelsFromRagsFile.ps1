@@ -18,9 +18,9 @@ function Expand-ItemLayeredZoneLevelsFromRagsFile {
     value is a sequence of strings, one per ItemLayeredZoneLevels row of
     that item. Unlike the ItemActions data, the Data column of this table
     is a plain string column whose value is written verbatim (without
-    RAGS action decoding); embedded carriage returns are normalized to
-    line-feed characters, because YAML literal block scalars normalize
-    line breaks that way when read back. The Data values of an item are
+    RAGS action decoding), original line breaks included; a YAML literal
+    block scalar normalizes a written value's line breaks to line feeds
+    only when the written YAML is read back. The Data values of an item are
     never deduplicated: every read row of an item contributes exactly one
     Data sequence entry, and identical values may repeat.
 
@@ -166,14 +166,14 @@ function Expand-ItemLayeredZoneLevelsFromRagsFile {
             Write-Warning "Merging the ItemLayeredZoneLevels row of item '$itemId' (ID '$rowId') into the entry of item '$($groupNames[$groupIndex])': the raw ItemID value differs only in character case and is merged into the lowercased entry key."
         }
 
-        # A YAML literal block scalar normalizes line breaks to line-feed
-        # characters when the written YAML is read back, so carriage
-        # returns are normalized away beforehand to keep the round-trip
-        # byte-exact. The normalized value is assigned to a local first:
-        # operator expressions passed directly as method arguments are
-        # mis-tokenized as additional arguments on both hosts.
-        $normalizedData = ([string]$data) -replace '\r\n?', "`n"
-        $groupDataValues[$groupIndex].Add($normalizedData)
+        # The Data value is staged verbatim, original line breaks included;
+        # a YAML literal block scalar normalizes a written value's line
+        # breaks to line feeds only when the written YAML is read back.
+        # The value is assigned to a local first, as operator expressions
+        # passed directly as method arguments are mis-tokenized as
+        # additional arguments on both hosts.
+        $stagedData = [string]$data
+        $groupDataValues[$groupIndex].Add($stagedData)
     }
 
     # Build the top-level entry list, one entry per item in first-row

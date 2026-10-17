@@ -147,13 +147,12 @@ function Expand-CharacterActionsFromRagsFile {
             throw [System.Exception]::new($message, $_.Exception)
         }
 
-        # A YAML literal block scalar normalizes line breaks to line-feed
-        # characters when the written YAML is read back, so carriage returns
-        # are normalized away beforehand to keep the round-trip byte-exact.
-        # The normalized value is assigned before the method call, as an
-        # operator expression as a direct method argument mis-tokenizes.
-        $normalizedActionXml = $actionXml -replace '\r\n?', "`n"
-        $groupPayloads[$groupIndex].Add($normalizedActionXml)
+        # The expanded action XML is staged verbatim, exactly as
+        # Expand-RagsActionIntoXml produced it; a written value's line
+        # breaks are normalized to line feeds only when the written YAML
+        # is read back (the literal block scalar's reading rule).
+        $stagedActionXml = [string]$actionXml
+        $groupPayloads[$groupIndex].Add($stagedActionXml)
     }
 
     # Write one YAML file per character group. Characters whose every row was

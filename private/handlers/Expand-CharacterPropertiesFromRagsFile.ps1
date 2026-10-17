@@ -18,12 +18,13 @@ function Expand-CharacterPropertiesFromRagsFile {
     value is a sequence of mappings, one per CharacterProperties row of
     that character; each of those holds the property Name and its Value.
     The Value of a row is emitted as a YAML null when the column is null;
-    multi-line values are emitted as YAML literal block scalars whose line
-    breaks were normalized to line-feed characters, because YAML normalizes
-    line breaks to line feeds when a literal block is read back (so
-    carriage returns are normalized beforehand, and because the
-    normalization runs before the duplicate-name check below, a duplicate
-    warning reports the normalized value of the ignored duplicate row).
+    multi-line values are emitted as YAML literal block scalars. YAML
+    normalizes a literal block's line breaks to line feeds when the
+    written YAML is read back, so a read-back value carries the line-feed
+    form of whatever line breaks the table stores; the value itself is
+    emitted verbatim. Because the value is read before the duplicate-name
+    check below, a duplicate warning reports the raw value of the ignored
+    duplicate row.
 
     Rows are grouped by the exact Charname value: names which differ only
     in character case produce separate entries, as documented for the
@@ -141,18 +142,18 @@ function Expand-CharacterPropertiesFromRagsFile {
         $properties = $groupProperties[$groupIndex]
 
         # A null Value column is a meaningful property value (it is emitted
-        # as a YAML null); every other value is read as a string whose line
-        # breaks were normalized to line feed characters, because a YAML
-        # literal block scalar normalizes line breaks that way when read
-        # back. Values are never skipped, and the normalization is done
+        # as a YAML null); every other value is read as a string and staged
+        # verbatim (a YAML literal block scalar normalizes a written
+        # value's line breaks to line feeds only when the written YAML is
+        # read back). Values are never skipped, and the value is read
         # before the duplicate check below so that the ignored duplicate
-        # row's warning can report the ignored row's own value.
+        # row's warning can report the ignored row's own raw value.
         $propertyValue = $row['Value']
         if (($null -eq $propertyValue) -or ($propertyValue -is [System.DBNull])) {
             $propertyValue = $null
         }
         else {
-            $propertyValue = ([string]$propertyValue) -replace '\r\n?', "`n"
+            $propertyValue = [string]$propertyValue
         }
 
         # Soft-validate the Unique Name column, as documented for the

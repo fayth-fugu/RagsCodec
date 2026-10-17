@@ -120,12 +120,13 @@ function Compress-ItemPropertiesIntoRagsFile {
       general form rather than as the ISO 8601 string an expansion
       extracts). A property Value which is a sequence or a mapping
       aborts the whole operation with an exception.
-    - Property values are normalized to line-feed line breaks before
-      they are staged, because the expansion emits every multi-line
-      value as a YAML literal block scalar whose line breaks are read
-      back as line feeds; carriage returns in hand-edited files would
-      otherwise re-expand into different values. The staged value never
-      carries a line break other than a line feed.
+    - Property values are stored as read: no line-ending normalization
+      is applied (the verbatim contract of the expansion family — note
+      that a multi-line value re-emits through a YAML literal block,
+      whose re-read normalizes the written breaks to line feeds; a
+      carriage return which arrives in the parsed value, from a
+      double-quoted '\r' escape in a hand-edited file for example, is
+      staged verbatim).
 
     The 'ItemProperties.yaml' file is read, validated and fully staged
     before the first row is appended, so the table remains empty when the
@@ -604,16 +605,6 @@ function Compress-ItemPropertiesIntoRagsFile {
                         $storableValue = [string]$propertyDataValue
                     }
                 }
-
-                # A YAML literal block scalar normalizes line breaks to
-                # line-feed characters when the written YAML is read back,
-                # so carriage returns are normalized away beforehand to
-                # keep the round-trip byte-exact. The normalized value is
-                # assigned to a local first: operator expressions passed
-                # directly as method arguments are mis-tokenized as
-                # additional arguments on both hosts.
-                $normalizedValue = ([string]$storableValue) -replace '\r\n?', "`n"
-                $storableValue = $normalizedValue
             }
 
             # Soft-validate the Unique Name column: the property names of

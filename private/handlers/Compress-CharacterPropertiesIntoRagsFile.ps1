@@ -106,12 +106,13 @@ function Compress-CharacterPropertiesIntoRagsFile {
       round-trips through hosts of different cultures (except for date
       values, which are written in their invariant general form rather
       than as the ISO 8601 string an expansion extracts). Property
-      values are normalized to line-feed line breaks before they are
-      staged, because the expansion emits every multi-line value as a
-      YAML literal block scalar whose line breaks are read back as line
-      feeds; carriage returns in hand-edited files would otherwise
-      re-expand into different values. The staged value never carries a
-      line break other than a line feed.
+      values are stored as read: no line-ending normalization is
+      applied (the verbatim contract of the expansion family — note
+      that a multi-line value re-emits through a YAML literal block,
+      whose re-read normalizes the written breaks to line feeds; a
+      carriage return which arrives in the parsed value, from a
+      double-quoted '\r' escape in a hand-edited file for example, is
+      staged verbatim).
     - Keys of an entry other than Charname and Name, and keys of a
       property other than Name and Value, are ignored with a warning.
 
@@ -509,9 +510,7 @@ function Compress-CharacterPropertiesIntoRagsFile {
             # values therefore round-trip through hosts of different
             # cultures). The value is derived BEFORE the duplicate check
             # below, so that the warning of the check reports the value of
-            # the ignored property; the line-break normalization below
-            # also runs before the check, so the reported value is the
-            # normalized value of the ignored property.
+            # the ignored property.
             $propertyDataValue = $propertyValue['Value']
             $storableValue = $null
             if ($null -ne $propertyDataValue) {
@@ -533,17 +532,6 @@ function Compress-CharacterPropertiesIntoRagsFile {
                         $storableValue = [string]$propertyDataValue
                     }
                 }
-
-                # A YAML literal block scalar normalizes line breaks to
-                # line-feed characters when the written YAML is read back
-                # (the expansion emits every multi-line value as one), so
-                # carriage returns are normalized away before the value is
-                # staged, to keep the round-trip byte-exact. The
-                # normalized value is assigned to a local first: operator
-                # expressions passed directly as method arguments are
-                # mis-tokenized as additional arguments on both hosts.
-                $normalizedValue = ([string]$storableValue) -replace '\r\n?', "`n"
-                $storableValue = $normalizedValue
             }
 
             # Soft-validate the Unique Name column: the property Name of a

@@ -35,11 +35,11 @@ function Expand-ItemPropertiesFromRagsFile {
     verbose message of the expansion cites the lowercased ItemID value.
 
     The Value of a row is emitted as a YAML null when the column is null,
-    and multi-line values are emitted as YAML literal block scalars whose
-    line breaks were normalized to line-feed characters (YAML normalizes
-    line breaks to line feeds when a literal block is read back, so
-    carriage returns are normalized beforehand to keep the round-trip
-    byte-exact).
+    and multi-line values are emitted as YAML literal block scalars. YAML
+    normalizes a literal block's line breaks to line feeds when the
+    written YAML is read back, so a read-back value carries the line-feed
+    form of whatever line breaks the table stores; the value itself is
+    emitted verbatim.
 
     Rows with a null, empty or whitespace-only ItemID or Name value are
     skipped with a warning, as no meaningful entry or property key can be
@@ -170,18 +170,18 @@ function Expand-ItemPropertiesFromRagsFile {
         $properties = $groupProperties[$groupIndex]
 
         # A null Value column is a meaningful property value (it is emitted
-        # as a YAML null); every other value is read as a string whose line
-        # breaks were normalized to line feed characters, because a YAML
-        # literal block scalar normalizes line breaks that way when read
-        # back. Values are never skipped. The normalized value is assigned
-        # to a local before the duplicate check, so that the warning can
-        # report the value of the ignored row itself.
+        # as a YAML null); every other value is read as a string and staged
+        # verbatim (a YAML literal block scalar normalizes a written
+        # value's line breaks to line feeds only when the written YAML is
+        # read back). Values are never skipped. The value is assigned to a
+        # local before the duplicate check, so that the warning can report
+        # the raw value of the ignored row itself.
         $propertyValue = $row['Value']
         if (($null -eq $propertyValue) -or ($propertyValue -is [System.DBNull])) {
             $propertyValue = $null
         }
         else {
-            $propertyValue = ([string]$propertyValue) -replace '\r\n?', "`n"
+            $propertyValue = [string]$propertyValue
         }
 
         # Soft-validate the Unique Name column: the property names of an

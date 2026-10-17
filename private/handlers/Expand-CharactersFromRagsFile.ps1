@@ -17,11 +17,11 @@ function Expand-CharactersFromRagsFile {
     columns of the Characters table: the Charname key and the other eight
     column values. Character genders are emitted as YAML integers, the
     three inventory/time flags are emitted as YAML booleans and the
-    Description column is emitted as a multi-line literal block scalar whose
-    line breaks were normalized to line-feed characters (YAML normalizes
-    line breaks to line feeds when a literal block is read back, so
-    carriage returns are normalized beforehand to keep the round-trip
-    byte-exact). Every other null column value is emitted as a YAML null.
+    Description column is emitted as a multi-line literal block scalar. YAML
+    normalizes a literal block's line breaks to line feeds when the written
+    YAML is read back, so a read-back description carries the line-feed form
+    of whatever line breaks the table stores; the value itself is emitted
+    verbatim. Every other null column value is emitted as a YAML null.
 
     Rows are expected to hold distinct Charname values: the table is
     sorted by Charname ascending, as documented for the 'Characters' table
@@ -113,13 +113,13 @@ function Expand-CharactersFromRagsFile {
 
         # A null column value is written as a YAML null, except for the
         # three bit columns, where a null is written as a YAML false
-        # (documented flag mapping). The Description value is normalized
-        # to line feeds beforehand, both because a YAML literal block
-        # scalar normalizes line breaks that way when read back and so
-        # that the duplicate warning below can report the value of the
-        # ignored row as it would have been written. Every value is
-        # computed before the duplicate check so that the warnings below
-        # never read a value of a previous iteration.
+        # (documented flag mapping). The Description value is staged
+        # verbatim (a YAML literal block scalar normalizes a written
+        # value's line breaks to line feeds only when the written YAML is
+        # read back). Every value is computed before the duplicate check
+        # so that the warnings below never read a value of a previous
+        # iteration, and the duplicate warning cites the raw value of the
+        # ignored row.
         $charnameOverride = $row['CharnameOverride']
         if (($null -eq $charnameOverride) -or ($charnameOverride -is [System.DBNull])) {
             $charnameOverride = $null
@@ -146,7 +146,7 @@ function Expand-CharactersFromRagsFile {
             $description = $null
         }
         else {
-            $description = ([string]$description) -replace '\r\n?', "`n"
+            $description = [string]$description
         }
 
         # The managed reader returns bit columns as Boolean values; a

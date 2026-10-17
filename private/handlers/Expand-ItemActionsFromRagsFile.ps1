@@ -221,10 +221,12 @@ function Expand-ItemActionsFromRagsFile {
             throw [System.Exception]::new($message, $_.Exception)
         }
 
-        # A YAML literal block scalar normalizes line breaks to line-feed
-        # characters when the written YAML is read back, so carriage returns
-        # are normalized away beforehand to keep the round-trip byte-exact.
-        $groupPayloads[$groupIndex].Add(($actionXml -replace '\r\n?', "`n"))
+        # The expanded action XML is staged verbatim, exactly as
+        # Expand-RagsActionIntoXml produced it; a written value's line
+        # breaks are normalized to line feeds only when the written YAML
+        # is read back (the literal block scalar's reading rule).
+        $stagedActionXml = [string]$actionXml
+        $groupPayloads[$groupIndex].Add($stagedActionXml)
     }
 
     # Write one YAML file per item group. Items whose every row was skipped

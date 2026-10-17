@@ -16,11 +16,11 @@ function Expand-GameDataFromRagsFile {
     column of the GameData table, in the column order of the schema. The
     six bit columns are emitted as YAML booleans, the three sort-order
     columns as YAML integers and every other column as a YAML string —
-    the four ntext columns as multi-line literal block scalars whose line
-    breaks were normalized to line-feed characters (YAML normalizes line
-    breaks to line feeds when a literal block is read back, so carriage
-    returns are normalized beforehand to keep the round-trip
-    byte-exact). Every null column value is emitted as a YAML null.
+    the four ntext columns as multi-line literal block scalars. YAML
+    normalizes a literal block's line breaks to line feeds when the
+    written YAML is read back, so a read-back value carries the line-feed
+    form of whatever line breaks the table stores; the values themselves
+    are emitted verbatim. Every null column value is emitted as a YAML null.
 
     The GameData table is documented to hold a single row; rows after
     the first are ignored, one warning each, which names the row's
@@ -112,9 +112,8 @@ function Expand-GameDataFromRagsFile {
         # Every value is computed before the warning below so that it
         # never reads a value of a previous iteration. Text columns are
         # cited quoted; a null is cited as '<null>'. The four ntext
-        # values are normalized to line feeds beforehand, so that the
-        # warning can report the value of the ignored row as it would
-        # have been written. The managed reader returns bit columns as
+        # values are cited as read (verbatim, original line breaks
+        # included). The managed reader returns bit columns as
         # Boolean values; a missing value is read as the documented
         # false, whose value the warning below accordingly cites 'after
         # reading': a row storing a null is reported with the false it
@@ -175,14 +174,14 @@ function Expand-GameDataFromRagsFile {
             $ignoredGameFont = [string]$ignoredGameFont
         }
 
-        # The ntext columns are normalized to line feeds before the
-        # warning cites them (the normalized world).
+        # The ntext columns are cited as read (verbatim, original line
+        # breaks included).
         $ignoredOpeningMessage = $ignoredRow['OpeningMessage']
         if (($null -eq $ignoredOpeningMessage) -or ($ignoredOpeningMessage -is [System.DBNull])) {
             $ignoredOpeningMessage = $null
         }
         else {
-            $ignoredOpeningMessage = ([string]$ignoredOpeningMessage) -replace '\r\n?', "`n"
+            $ignoredOpeningMessage = [string]$ignoredOpeningMessage
         }
 
         $ignoredGameInformation = $ignoredRow['GameInformation']
@@ -190,7 +189,7 @@ function Expand-GameDataFromRagsFile {
             $ignoredGameInformation = $null
         }
         else {
-            $ignoredGameInformation = ([string]$ignoredGameInformation) -replace '\r\n?', "`n"
+            $ignoredGameInformation = [string]$ignoredGameInformation
         }
 
         $ignoredRoomGroups = $ignoredRow['RoomGroups']
@@ -198,7 +197,7 @@ function Expand-GameDataFromRagsFile {
             $ignoredRoomGroups = $null
         }
         else {
-            $ignoredRoomGroups = ([string]$ignoredRoomGroups) -replace '\r\n?', "`n"
+            $ignoredRoomGroups = [string]$ignoredRoomGroups
         }
 
         $ignoredClothingZoneLevels = $ignoredRow['ClothingZoneLevels']
@@ -206,7 +205,7 @@ function Expand-GameDataFromRagsFile {
             $ignoredClothingZoneLevels = $null
         }
         else {
-            $ignoredClothingZoneLevels = ([string]$ignoredClothingZoneLevels) -replace '\r\n?', "`n"
+            $ignoredClothingZoneLevels = [string]$ignoredClothingZoneLevels
         }
 
         $ignoredHideMainPicDisplay = $ignoredRow['HideMainPicDisplay']
@@ -281,7 +280,7 @@ function Expand-GameDataFromRagsFile {
         Write-Warning "Ignoring the GameData row $($readRowNumber) of the read result: the GameData table is expected to hold a single row, so only the first read row is expanded. The ignored row has the column values $($evidenceParts -join ', ')."
     }
 
-    # Normalized column values, computed before the mapping is built. When
+    # Column values, computed before the mapping is built. When
     # no row was read every value stays null: an empty GameData table is
     # expanded into an all-null mapping (whereas a read row maps its null
     # bit columns to false, per the documented reading of missing bit
@@ -365,16 +364,15 @@ function Expand-GameDataFromRagsFile {
             $gameFont = [string]$gameFont
         }
 
-        # The ntext columns are emitted as YAML strings whose line breaks
-        # were normalized to line feeds (both because a YAML literal block
-        # scalar normalizes line breaks that way when read back and so
-        # that the expansion round-trips byte-exactly).
+        # The ntext columns are emitted as YAML strings, verbatim. A YAML
+        # literal block scalar normalizes a written value's line breaks to
+        # line feeds only when the written YAML is read back.
         $openingMessage = $row['OpeningMessage']
         if (($null -eq $openingMessage) -or ($openingMessage -is [System.DBNull])) {
             $openingMessage = $null
         }
         else {
-            $openingMessage = ([string]$openingMessage) -replace '\r\n?', "`n"
+            $openingMessage = [string]$openingMessage
         }
 
         $gameInformation = $row['GameInformation']
@@ -382,7 +380,7 @@ function Expand-GameDataFromRagsFile {
             $gameInformation = $null
         }
         else {
-            $gameInformation = ([string]$gameInformation) -replace '\r\n?', "`n"
+            $gameInformation = [string]$gameInformation
         }
 
         $roomGroups = $row['RoomGroups']
@@ -390,7 +388,7 @@ function Expand-GameDataFromRagsFile {
             $roomGroups = $null
         }
         else {
-            $roomGroups = ([string]$roomGroups) -replace '\r\n?', "`n"
+            $roomGroups = [string]$roomGroups
         }
 
         $clothingZoneLevels = $row['ClothingZoneLevels']
@@ -398,7 +396,7 @@ function Expand-GameDataFromRagsFile {
             $clothingZoneLevels = $null
         }
         else {
-            $clothingZoneLevels = ([string]$clothingZoneLevels) -replace '\r\n?', "`n"
+            $clothingZoneLevels = [string]$clothingZoneLevels
         }
 
         # The managed reader returns bit columns as Boolean values; a

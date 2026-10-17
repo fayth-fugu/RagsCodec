@@ -72,12 +72,14 @@ function Compress-CharactersIntoRagsFile {
       aborts the whole operation with an exception, as no meaningful
       scalar can be derived from it.
     - The Description value (which never carries a length limit) is
-      stored with the same scalar coercion as the text columns, except
-      that its line breaks are normalized to line feeds without a
-      warning: the expansion emits the Description value with line-feed
-      line breaks, so a stored carriage-return value would expand into
-      different data. A Description value which is a sequence or a
-      mapping aborts the whole operation with an exception.
+      stored with the same scalar coercion as the text columns, with no
+      line-ending normalization applied (the verbatim contract of the
+      expansion family — note that a multi-line value re-emits through
+      a YAML literal block, whose re-read normalizes the written breaks
+      to line feeds; a parsed carriage return from a double-quoted
+      '\r' escape is staged verbatim). A Description value which is a
+      sequence or a mapping aborts the whole operation with an
+      exception.
     - A CharGender value which is missing or null is stored as a database
       null without a warning, as the expansion emits a YAML null for a
       null CharGender column. A CharGender value which is an integer
@@ -462,14 +464,15 @@ function Compress-CharactersIntoRagsFile {
         }
 
         # The Description value is stored with the same scalar coercion
-        # as the other text columns, except that its line breaks are
-        # normalized to line feeds without a warning: the expansion
-        # emits the Description value with line-feed line breaks (and a
-        # literal block re-parses normalized as well), so a stored
-        # carriage-return value would expand into different data. Like
-        # every ntext column it holds no length limit to truncate to,
-        # and the normalization runs before the duplicate evidence
-        # below so that the warning reports the stored value.
+        # as the other text columns, and verbatim: no line-ending
+        # normalization is applied (the expansion family's verbatim
+        # contract — a multi-line value re-emits through a YAML literal
+        # block whose re-read normalizes the written breaks to line
+        # feeds, while a parsed carriage return from a double-quoted
+        # escape arrives as-is). Like every ntext column it holds no
+        # length limit to truncate to, and the value is derived BEFORE
+        # the duplicate evidence below so that the warning reports the
+        # recorded value.
         $descriptionValue = $entryValue['Description']
         $description = $null
         if ($null -ne $descriptionValue) {
@@ -480,15 +483,15 @@ function Compress-CharactersIntoRagsFile {
                 throw "Cannot compress the Characters data of the RAGS file: the Description of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder carries a mapping where a scalar value is expected."
             }
             elseif ($descriptionValue -is [string]) {
-                $description = ($descriptionValue -replace '\r\n?', "`n")
+                $description = $descriptionValue
             }
             else {
                 Write-Warning "The Description of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder is of type '$($descriptionValue.GetType().FullName)' instead of a string; it is coerced to its invariant string form."
                 if ($descriptionValue -is [System.IFormattable]) {
-                    $description = ($descriptionValue.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture) -replace '\r\n?', "`n")
+                    $description = $descriptionValue.ToString([string]::Empty, [System.Globalization.CultureInfo]::InvariantCulture)
                 }
                 else {
-                    $description = ([string]$descriptionValue -replace '\r\n?', "`n")
+                    $description = [string]$descriptionValue
                 }
             }
         }

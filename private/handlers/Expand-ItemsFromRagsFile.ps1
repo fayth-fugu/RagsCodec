@@ -18,11 +18,11 @@ function Expand-ItemsFromRagsFile {
     locations are emitted as YAML integers and the flag columns are emitted
     as YAML booleans where a missing value is read as false (the documented
     flag mapping). The Description column is emitted as a multi-line literal
-    block scalar whose line breaks were normalized to line-feed characters
-    (YAML normalizes line breaks to line feeds when a literal block is read
-    back, so carriage returns are normalized beforehand to keep the
-    round-trip byte-exact). Every other null column value is emitted as a
-    YAML null.
+    block scalar. YAML normalizes a literal block's line breaks to line
+    feeds when the written YAML is read back, so a read-back description
+    carries the line-feed form of whatever line breaks the table stores;
+    the value itself is emitted verbatim. Every other null column value is
+    emitted as a YAML null.
 
     Rows are expected to hold distinct UniqueID values: the table is
     sorted by UniqueID ascending before it is read ("Table is sorted by
@@ -126,13 +126,13 @@ function Expand-ItemsFromRagsFile {
 
         # A null column value is written as a YAML null, except for the
         # bit columns, where a null is written as a YAML false (documented
-        # flag mapping). The Description value is normalized to line feeds
-        # beforehand, both because a YAML literal block scalar normalizes
-        # line breaks that way when read back and so that the duplicate
-        # warning below can report the value of the ignored row as it
-        # would have been written. Every value is computed before the
-        # duplicate check so that the warnings below never read a value of
-        # a previous iteration (the stale-variable rule).
+        # flag mapping). The Description value is staged verbatim (a YAML
+        # literal block scalar normalizes a written value's line breaks to
+        # line feeds only when the written YAML is read back). Every value
+        # is computed before the duplicate check so that the warnings below
+        # never read a value of a previous iteration (the stale-variable
+        # rule), and the duplicate warning cites the raw value of the
+        # ignored row.
         $name = $row['Name']
         if (($null -eq $name) -or ($name -is [System.DBNull])) {
             $name = $null
@@ -146,7 +146,7 @@ function Expand-ItemsFromRagsFile {
             $description = $null
         }
         else {
-            $description = ([string]$description) -replace '\r\n?', "`n"
+            $description = [string]$description
         }
 
         $sdesc = $row['SDesc']

@@ -45,8 +45,9 @@ function Compress-GameDataIntoRagsFile {
     - An ntext column value (OpeningMessage, GameInformation, RoomGroups,
       ClothingZoneLevels) is stored as read, with the same scalar coercion
       as the text columns. Like every ntext column it holds no length
-      limit to truncate to; the expansion normalizes line breaks on both
-      sides of the round-trip.
+      limit to truncate to; no line-ending normalization is applied on
+      either side of the round-trip (the verbatim contract of the
+      expansion family).
     - A bit column value (HideMainPicDisplay, UseInlineImages, HidePortrait,
       RepeatbgMusic, PasswordProtected) which is missing or null is
       stored as false without a warning, as the YAML rules of the data

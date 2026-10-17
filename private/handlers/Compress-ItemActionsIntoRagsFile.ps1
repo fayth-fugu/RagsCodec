@@ -420,9 +420,9 @@ function Compress-ItemActionsIntoRagsFile {
             }
 
             # Compress the pretty-printed XML snippet into its encoded RAGS
-            # action form; the snippet is linearized (and its line endings
-            # normalized) by the compressor, as the payload is usually
-            # stored linearized.
+            # action form; the snippet is linearized (its line breaks
+            # stripped by the XML writer) by the compressor, as the
+            # payload is usually stored linearized.
             try {
                 $encodedAction = Compress-RagsActionFromXml -XmlRagsAction $entryValue
             }
