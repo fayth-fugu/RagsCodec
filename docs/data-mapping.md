@@ -51,7 +51,7 @@
   - `bit` => `!!bool`
     - `0` and `null` values are mapped to `false`, while `1` is mapped to `true`
   - `float` => `!!float`
-  - `image` => `!!binary`
+  - `image` => `!!str`
     - The binary stream is *Base64-encoded* during expansion
   - `datetime` => `!!timestamp`
     - `datetime` values are extracted as *ISO 8601 strings*
@@ -128,6 +128,9 @@
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are **case-insensitive**
       - Only the first detected casing will be read
+  - Lowercase enforcement: values of these columns will always be coerced to lowercase during expansion and compression:
+    - `CurrentRoom`
+    - `CharPortrait`
   - Sample structure of a `Characters.yaml` file:
     ```yaml
     Characters:
@@ -163,6 +166,8 @@
   - Expanded into a single file — `GameData.yaml`
   - This table should only have **a single row** — if multiple rows exist, only the first row's column values will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
+  - Lowercase enforcement: values of these columns will always be coerced to lowercase during expansion and compression:
+    - `bgMusic`
   - Sample structure of a `GameData.yaml` file:
     ```yaml
     Title: {Title}
@@ -368,7 +373,26 @@
     ```
 - `Media`
   - Expanded into a subfolder — `Media/`
-  - TODO
+  - Table is sorted by `Name` ascending
+  - `Unique`-column handling: If multiple identical `Name`s exist, then only the first row's column values will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+      - The value of the `Data` column will not be shown in the warning
+    - A YAML file is created for each `Name` value with the naming convention `{GUID}.yaml`
+      - The `GUID` value is derived from `Name` as described above
+    - Values are **case-insensitive**
+      - Always coerced to lowercase
+  - Sample structure of each `{GUID}.yaml` file:
+    ```yaml
+    Name: {Name}
+    BackgroundColor: {BackgroundColor}
+    TextColor: {TextColor}
+    TextFont: {TextFont}
+    ImageName: {ImageName}
+    UseEnhancedGraphics: {UseEnhancedGraphics}
+    NewImage: {NewImage}
+    Data: {Data}
+    GroupName: {GroupName}
+    ```
 - `MediaGroups`
   - Expanded into a single file — `MediaGroups.yaml`
   - TODO
