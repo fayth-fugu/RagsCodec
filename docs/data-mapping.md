@@ -395,7 +395,21 @@
     ```
 - `MediaGroups`
   - Expanded into a single file — `MediaGroups.yaml`
-  - TODO
+  - Table is sorted first by `Name` ascending, then by `ID` ascending
+  - `Unique`-column handling: If multiple identical `Name`s exist, then only the `Parent` of the first row will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+    - Values are **case-insensitive**
+      - Only the first detected casing will be read
+  - Sample structure of a `MediaGroups.yaml` file:
+    ```yaml
+    MediaGroups:
+      - Name: {Name}
+        Parent: {Parent}
+      - Name: {Name}
+        Parent: {Parent}
+      - Name: {Name}
+        Parent: {Parent}
+    ```
 - `MediaLayeredImages`
   - Expanded into a single file — `MediaLayeredImages.yaml`
   - TODO
