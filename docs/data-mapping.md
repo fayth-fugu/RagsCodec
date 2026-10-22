@@ -412,7 +412,42 @@
     ```
 - `MediaLayeredImages`
   - Expanded into a single file — `MediaLayeredImages.yaml`
-  - TODO
+  - `List`-column handling: Each distinct `MediaName` value starts a new entry in the top-level YAML sequence
+    - Values are **case-insensitive**
+      - Always coerced to lowercase
+  - Table is sorted first by `MediaName` ascending, then by `Order` ascending, then by `ID` ascending
+  - `Unique`-column handling: If multiple identical `Order`s exist for the same `MediaName` value, then only the `Data` of the first row will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+  - Lowercase enforcement: values of these columns will always be coerced to lowercase during expansion and compression:
+    - `Data`
+  - Sample structure of a `MediaLayeredImages.yaml` file:
+    ```yaml
+    MediaLayeredImages:
+      - MediaName: {MediaName}
+        Order:
+          - Order: {Order}
+            Data: {Data}
+          - Order: {Order}
+            Data: {Data}
+          - Order: {Order}
+            Data: {Data}
+      - MediaName: {MediaName}
+        Order:
+          - Order: {Order}
+            Data: {Data}
+          - Order: {Order}
+            Data: {Data}
+          - Order: {Order}
+            Data: {Data}
+      - MediaName: {MediaName}
+        Order:
+          - Order: {Order}
+            Data: {Data}
+          - Order: {Order}
+            Data: {Data}
+          - Order: {Order}
+            Data: {Data}
+    ```
 - `Player`
   - Expanded into a single file — `Player.yaml`
   - TODO
