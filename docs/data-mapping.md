@@ -292,6 +292,8 @@
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are **case-insensitive**
       - Always coerced to lowercase
+  - Lowercase enforcement: values of these columns will always be coerced to lowercase during expansion and compression:
+    - `LocationName`
   - Sample structure of an `Items.yaml` file:
     ```yaml
     Items:
@@ -450,7 +452,25 @@
     ```
 - `Player`
   - Expanded into a single file — `Player.yaml`
-  - TODO
+  - This table should only have **a single row** — if multiple rows exist, only the first row's column values will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+  - Lowercase enforcement: values of these columns will always be coerced to lowercase during expansion and compression:
+    - `StartingRoom`
+    - `PlayerPortrait`
+  - Sample structure of a `Player.yaml` file:
+    ```yaml
+    Name: {Name}
+    Description: {Description}
+    StartingRoom: {StartingRoom}
+    CurrentRoom: {CurrentRoom}
+    PlayerLayeredImage: {PlayerLayeredImage}
+    PlayerGender: {PlayerGender}
+    PromptForName: {PromptForName}
+    PromptForGender: {PromptForGender}
+    PlayerPortrait: {PlayerPortrait}
+    EnforceWeight: {EnforceWeight}
+    WeightLimit: {WeightLimit}
+    ```
 - `PlayerActions`
   - Expanded into a single file — `PlayerActions.yaml`
   - TODO
