@@ -473,7 +473,15 @@
     ```
 - `PlayerActions`
   - Expanded into a single file — `PlayerActions.yaml`
-  - TODO
+  - Table is sorted by `ID` ascending
+  - `RagsAction`-column handling: All `Data` rows are extracted using `RagsAction` expansion
+  - Sample structure of a `PlayerActions.yaml` file:
+    ```yaml
+    Data:
+      - {Data}
+      - {Data}
+      - {Data}
+    ```
 - `PlayerProperties`
   - Expanded into a single file — `PlayerProperties.yaml`
   - TODO
