@@ -500,7 +500,19 @@
     ```
 - `RoomActions`
   - Expanded into a subfolder — `RoomActions/`
-  - TODO
+  - `List`-column handling: A YAML file is created for each distinct `RoomID` value with the naming convention `{RoomID}.yaml`
+    - Values are **case-insensitive**
+      - Always coerced to lowercase
+  - Table is sorted first by `RoomID` ascending, then by `ID` ascending
+  - `RagsAction`-column handling: All `Data` rows for each `RoomID` are extracted using `RagsAction` expansion
+  - Sample structure of each `{RoomID}.yaml` file:
+    ```yaml
+    RoomID: {RoomID}
+    Data:
+      - {Data}
+      - {Data}
+      - {Data}
+    ```
 - `RoomExits`
   - Expanded into a single file — `RoomExits.yaml`
   - TODO
