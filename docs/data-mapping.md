@@ -484,7 +484,20 @@
     ```
 - `PlayerProperties`
   - Expanded into a single file — `PlayerProperties.yaml`
-  - TODO
+  - Table is sorted first by `Name` ascending, then by `ID` ascending
+  - `Unique`-column handling: If multiple identical `Name`s exist, then only the `Value` of the first row will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+    - Values are *case-sensitive*
+  - Sample structure of an `PlayerProperties.yaml` file:
+    ```yaml
+    PlayerProperties:
+      - Name: {Name}
+        Value: {Value}
+      - Name: {Name}
+        Value: {Value}
+      - Name: {Name}
+        Value: {Value}
+    ```
 - `RoomActions`
   - Expanded into a subfolder — `RoomActions/`
   - TODO
