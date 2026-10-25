@@ -573,7 +573,41 @@
     ```
 - `RoomProperties`
   - Expanded into a single file — `RoomProperties.yaml`
-  - TODO
+  - `List`-column handling: Each distinct `RoomID` value starts a new entry in the top-level YAML sequence
+    - Values are **case-insensitive**
+      - Always coerced to lowercase
+  - Table is sorted first by `RoomID` ascending, then by `Name` ascending, then by `ID` ascending
+  - `Unique`-column handling: If multiple identical `Name`s exist for the same `RoomID` value, then only the `Value` of the first row will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+    - Values are *case-sensitive*
+  - Sample structure of a `RoomProperties.yaml` file:
+    ```yaml
+    RoomProperties:
+      - RoomID: {RoomID}
+        Name:
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+      - RoomID: {RoomID}
+        Name:
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+      - RoomID: {RoomID}
+        Name:
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+          - Name: {Name}
+            Value: {Value}
+    ```
 - `Rooms`
   - Expanded into a single file — `Rooms.yaml`
   - TODO
