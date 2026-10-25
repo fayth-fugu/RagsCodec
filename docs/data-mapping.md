@@ -515,7 +515,62 @@
     ```
 - `RoomExits`
   - Expanded into a single file — `RoomExits.yaml`
-  - TODO
+  - `List`-column handling: Each distinct `RoomID` value starts a new entry in the top-level YAML sequence
+    - Values are **case-insensitive**
+      - Always coerced to lowercase
+  - Table is sorted first by `RoomID` ascending, then by `Direction` ascending, then by `ID` ascending
+  - `Unique`-column handling: If multiple identical `Direction`s exist for the same `RoomID` value, then only the first row's column values will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+  - Lowercase enforcement: values of these columns will always be coerced to lowercase during expansion and compression:
+    - `DestinationRoom`
+    - `PortalObjectName`
+      - The string value `<None>` is always passed through verbatim during expansion and compression of `PortalObjectName` without coercion
+    - Sample structure of a `RoomExits.yaml` file:
+    ```yaml
+    RoomExits:
+      - RoomID: {RoomID}
+        Direction:
+          - Direction: {Direction}
+            Active: {Active}
+            DestinationRoom: {DestinationRoom}
+            PortalObjectName: {PortalObjectName}
+          - Direction: {Direction}
+            Active: {Active}
+            DestinationRoom: {DestinationRoom}
+            PortalObjectName: {PortalObjectName}
+          - Direction: {Direction}
+            Active: {Active}
+            DestinationRoom: {DestinationRoom}
+            PortalObjectName: {PortalObjectName}
+      - RoomID: {RoomID}
+        Direction:
+          - Direction: {Direction}
+            Active: {Active}
+            DestinationRoom: {DestinationRoom}
+            PortalObjectName: {PortalObjectName}
+          - Direction: {Direction}
+            Active: {Active}
+            DestinationRoom: {DestinationRoom}
+            PortalObjectName: {PortalObjectName}
+          - Direction: {Direction}
+            Active: {Active}
+            DestinationRoom: {DestinationRoom}
+            PortalObjectName: {PortalObjectName}
+      - RoomID: {RoomID}
+        Direction:
+          - Direction: {Direction}
+            Active: {Active}
+            DestinationRoom: {DestinationRoom}
+            PortalObjectName: {PortalObjectName}
+          - Direction: {Direction}
+            Active: {Active}
+            DestinationRoom: {DestinationRoom}
+            PortalObjectName: {PortalObjectName}
+          - Direction: {Direction}
+            Active: {Active}
+            DestinationRoom: {DestinationRoom}
+            PortalObjectName: {PortalObjectName}      
+    ```
 - `RoomProperties`
   - Expanded into a single file — `RoomProperties.yaml`
   - TODO
