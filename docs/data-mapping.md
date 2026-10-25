@@ -610,7 +610,47 @@
     ```
 - `Rooms`
   - Expanded into a single file — `Rooms.yaml`
-  - TODO
+  - Table is sorted by `UniqueID` ascending
+  - `Unique`-column handling: If multiple identical `UniqueID`s exist, then only the first row's column values will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+    - Values are **case-insensitive**
+      - Always coerced to lowercase
+  - Lowercase enforcement: values of these columns will always be coerced to lowercase during expansion and compression:
+    - `RoomPic`
+      - The string value `None` is always passed through verbatim during expansion and compression of `RoomPic` without coercion
+    - `LayeredRoomPic`
+      - The string value `None` is always passed through verbatim during expansion and compression of `LayeredRoomPic` without coercion
+  - Sample structure of a `Rooms.yaml` file:
+    ```yaml
+    Rooms:
+      - UniqueID: {UniqueID}
+        Description: {Description}
+        SDesc: {SDesc}
+        Name: {Name}
+        RoomPic: {RoomPic}
+        EnterFirstTime: {EnterFirstTime}
+        LeaveFirstTime: {LeaveFirstTime}
+        Group: {Group}
+        LayeredRoomPic: {LayeredRoomPic}
+      - UniqueID: {UniqueID}
+        Description: {Description}
+        SDesc: {SDesc}
+        Name: {Name}
+        RoomPic: {RoomPic}
+        EnterFirstTime: {EnterFirstTime}
+        LeaveFirstTime: {LeaveFirstTime}
+        Group: {Group}
+        LayeredRoomPic: {LayeredRoomPic}
+      - UniqueID: {UniqueID}
+        Description: {Description}
+        SDesc: {SDesc}
+        Name: {Name}
+        RoomPic: {RoomPic}
+        EnterFirstTime: {EnterFirstTime}
+        LeaveFirstTime: {LeaveFirstTime}
+        Group: {Group}
+        LayeredRoomPic: {LayeredRoomPic}
+    ```
 - `StatusBarItems`
   - Expanded into a single file — `StatusBarItems.yaml`
   - TODO
