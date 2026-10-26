@@ -540,7 +540,23 @@
     ```
 - `StatusBarItems`
   - Expanded into a single file — `StatusBarItems.yaml`
-  - TODO
+  - Table is sorted first by `ID` ascending, then by `Name` ascending
+  - `Unique`-column handling: If multiple identical `Name`s exist, then only the first row's column values will be read
+    - A warning containing the values of subsequent ignored duplicate rows will be shown
+    - Values are **case-insensitive**
+      - Only the first detected casing will be read
+  - Sample structure of a `StatusBarItems.yaml` file:
+    ```yaml
+    StatusBarItems:
+      - Name: {Name}
+        Text: {Text}
+        Width: {Width}
+        Visible: {Visible}
+      - Name: {Name}
+        Text: {Text}
+        Width: {Width}
+        Visible: {Visible}
+    ```
 - `Timer`
   - Expanded into a single file — `Timer.yaml`
   - TODO
