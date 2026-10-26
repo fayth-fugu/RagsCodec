@@ -100,7 +100,6 @@
     Data:
       - {Data}
       - {Data}
-      - {Data}
     ```
 - `CharacterProperties`
   - Expanded into a single file — `CharacterProperties.yaml`
@@ -119,20 +118,8 @@
             Value: {Value}
           - Name: {Name}
             Value: {Value}
-          - Name: {Name}
-            Value: {Value}
       - Charname: {Charname}
         Name:
-          - Name: {Name}
-            Value: {Value}
-          - Name: {Name}
-            Value: {Value}
-          - Name: {Name}
-            Value: {Value}
-      - Charname: {Charname}
-        Name:
-          - Name: {Name}
-            Value: {Value}
           - Name: {Name}
             Value: {Value}
           - Name: {Name}
@@ -151,15 +138,6 @@
   - Sample structure of a `Characters.yaml` file:
     ```yaml
     Characters:
-      - Charname: {Charname}
-        CharnameOverride: {CharnameOverride}
-        CharGender: {CharGender}
-        CurrentRoom: {CurrentRoom}
-        Description: {Description}
-        AllowInventoryInteraction: {AllowInventoryInteraction}
-        EnterFirstTime: {EnterFirstTime}
-        LeaveFirstTime: {LeaveFirstTime}
-        CharPortrait: {CharPortrait}
       - Charname: {Charname}
         CharnameOverride: {CharnameOverride}
         CharGender: {CharGender}
@@ -221,7 +199,6 @@
     Data:
       - {Data}
       - {Data}
-      - {Data}
     ```
 - `ItemGroups`
   - Expanded into a single file — `ItemGroups.yaml`
@@ -233,8 +210,6 @@
   - Sample structure of an `ItemGroups.yaml` file:
     ```yaml
     ItemGroups:
-      - Name: {Name}
-        Parent: {Parent}
       - Name: {Name}
         Parent: {Parent}
       - Name: {Name}
@@ -253,15 +228,8 @@
         Data:
           - {Data}
           - {Data}
-          - {Data}
       - ItemID: {ItemID}
         Data:
-          - {Data}
-          - {Data}
-          - {Data}
-      - ItemID: {ItemID}
-        Data:
-          - {Data}
           - {Data}
           - {Data}
     ```
@@ -283,20 +251,8 @@
             Value: {Value}
           - Name: {Name}
             Value: {Value}
-          - Name: {Name}
-            Value: {Value}
       - ItemID: {ItemID}
         Name:
-          - Name: {Name}
-            Value: {Value}
-          - Name: {Name}
-            Value: {Value}
-          - Name: {Name}
-            Value: {Value}
-      - ItemID: {ItemID}
-        Name:
-          - Name: {Name}
-            Value: {Value}
           - Name: {Name}
             Value: {Value}
           - Name: {Name}
@@ -314,31 +270,6 @@
   - Sample structure of an `Items.yaml` file:
     ```yaml
     Items:
-      - UniqueID: {UniqueID}
-        Name: {Name}
-        Description: {Description}
-        SDesc: {SDesc}
-        Preposition: {Preposition}
-        LocationName: {LocationName}
-        LocationType: {LocationType}
-        Carryable: {Carryable}
-        Wearable: {Wearable}
-        Openable: {Openable}
-        Lockable: {Lockable}
-        Enterable: {Enterable}
-        Readable: {Readable}
-        Container: {Container}
-        Weight: {Weight}
-        Worn: {Worn}
-        Read: {Read}
-        Locked: {Locked}
-        Open: {Open}
-        Entered: {Entered}
-        Visible: {Visible}
-        EnterFirstTime: {EnterFirstTime}
-        LeaveFirstTime: {LeaveFirstTime}
-        GroupName: {GroupName}
-        Important: {Important}
       - UniqueID: {UniqueID}
         Name: {Name}
         Description: {Description}
@@ -426,8 +357,6 @@
         Parent: {Parent}
       - Name: {Name}
         Parent: {Parent}
-      - Name: {Name}
-        Parent: {Parent}
     ```
 - `MediaLayeredImages`
   - Expanded into a single file — `MediaLayeredImages.yaml`
@@ -448,20 +377,8 @@
             Data: {Data}
           - Order: {Order}
             Data: {Data}
-          - Order: {Order}
-            Data: {Data}
       - MediaName: {MediaName}
         Order:
-          - Order: {Order}
-            Data: {Data}
-          - Order: {Order}
-            Data: {Data}
-          - Order: {Order}
-            Data: {Data}
-      - MediaName: {MediaName}
-        Order:
-          - Order: {Order}
-            Data: {Data}
           - Order: {Order}
             Data: {Data}
           - Order: {Order}
@@ -497,7 +414,6 @@
     Data:
       - {Data}
       - {Data}
-      - {Data}
     ```
 - `PlayerProperties`
   - Expanded into a single file — `PlayerProperties.yaml`
@@ -508,8 +424,6 @@
   - Sample structure of an `PlayerProperties.yaml` file:
     ```yaml
     PlayerProperties:
-      - Name: {Name}
-        Value: {Value}
       - Name: {Name}
         Value: {Value}
       - Name: {Name}
@@ -526,7 +440,6 @@
     ```yaml
     RoomID: {RoomID}
     Data:
-      - {Data}
       - {Data}
       - {Data}
     ```
@@ -555,10 +468,6 @@
             Active: {Active}
             DestinationRoom: {DestinationRoom}
             PortalObjectName: {PortalObjectName}
-          - Direction: {Direction}
-            Active: {Active}
-            DestinationRoom: {DestinationRoom}
-            PortalObjectName: {PortalObjectName}
       - RoomID: {RoomID}
         Direction:
           - Direction: {Direction}
@@ -569,24 +478,6 @@
             Active: {Active}
             DestinationRoom: {DestinationRoom}
             PortalObjectName: {PortalObjectName}
-          - Direction: {Direction}
-            Active: {Active}
-            DestinationRoom: {DestinationRoom}
-            PortalObjectName: {PortalObjectName}
-      - RoomID: {RoomID}
-        Direction:
-          - Direction: {Direction}
-            Active: {Active}
-            DestinationRoom: {DestinationRoom}
-            PortalObjectName: {PortalObjectName}
-          - Direction: {Direction}
-            Active: {Active}
-            DestinationRoom: {DestinationRoom}
-            PortalObjectName: {PortalObjectName}
-          - Direction: {Direction}
-            Active: {Active}
-            DestinationRoom: {DestinationRoom}
-            PortalObjectName: {PortalObjectName}      
     ```
 - `RoomProperties`
   - Expanded into a single file — `RoomProperties.yaml`
@@ -606,20 +497,8 @@
             Value: {Value}
           - Name: {Name}
             Value: {Value}
-          - Name: {Name}
-            Value: {Value}
       - RoomID: {RoomID}
         Name:
-          - Name: {Name}
-            Value: {Value}
-          - Name: {Name}
-            Value: {Value}
-          - Name: {Name}
-            Value: {Value}
-      - RoomID: {RoomID}
-        Name:
-          - Name: {Name}
-            Value: {Value}
           - Name: {Name}
             Value: {Value}
           - Name: {Name}
@@ -640,15 +519,6 @@
   - Sample structure of a `Rooms.yaml` file:
     ```yaml
     Rooms:
-      - UniqueID: {UniqueID}
-        Description: {Description}
-        SDesc: {SDesc}
-        Name: {Name}
-        RoomPic: {RoomPic}
-        EnterFirstTime: {EnterFirstTime}
-        LeaveFirstTime: {LeaveFirstTime}
-        Group: {Group}
-        LayeredRoomPic: {LayeredRoomPic}
       - UniqueID: {UniqueID}
         Description: {Description}
         SDesc: {SDesc}
