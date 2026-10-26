@@ -68,6 +68,23 @@
   - `CharacterActions`, `Media`, and `TimerActions` tables with `List` columns will have their column values converted to a `GUID` before being used as a filename
   - The column value is UTF-8 encoded, and the MD5 hash (a 16-byte digest) of the encoded bytes is used directly to construct a `GUID`, whose lowercase, dash-separated (`D` format) string form is used as the filename
 
+### Breaking changes
+
+- Column casing enforcement and distinct checks are **generally aligned with RAGS Designer**'s built-in restrictions (as of v2.6.1)
+- Discarded/coerced values do not cause functional changes, *with the exception of the following columns*
+  - `Media.Name` and its referencing columns in other tables
+    - RAGS Designer accepts multiple media uploads with the same name repeated or differently-cased
+    - Duplicate uploads after the first only show up in the media list but cannot actually be used
+    - All modifications/logic only apply to the first-uploaded duplicate
+    - To maintain consistency, the first instance of any media name (case-insensitive) is stored lowercase, and any subsequent repeats (case-insensitive) are discarded
+      - This **can potentially break** any Action logic referencing media by a specific-cased name
+  - `StatusBarItems.Name`
+    - RAGS Designer allows multiple status bar items with the same name repeated or differently-cased
+    - Duplicate entries after the first only show up in the status bar item list but cannot actually be interacted with
+    - All modifications only apply to the first-added duplicate
+    - To maintain consistency, the first instance of any status bar item name (case-insensitive) is stored verbatim, and any subsequent repeats (case-insensitive) are discarded
+      - This **can potentially break** any Action logic referencing status bar items by a specific-cased name
+
 ### Individual table handling
 
 - `CharacterActions`
