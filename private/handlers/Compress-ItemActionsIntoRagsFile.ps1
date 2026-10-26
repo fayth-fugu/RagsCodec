@@ -23,8 +23,8 @@ function Compress-ItemActionsIntoRagsFile {
     order of the original expansion: source files are read in file name
     order, the entries of each file keep their YAML sequence order, and the
     Identity values of the appended rows grow in insertion order, so
-    re-expanding the appended data restores each item's entries in ascending
-    row ID order.
+    re-expanding the appended data restores each item's entries in read
+    order.
 
     The YAML files of the subfolder are consumed as follows:
     - A file which defines more than one YAML document is consumed from its

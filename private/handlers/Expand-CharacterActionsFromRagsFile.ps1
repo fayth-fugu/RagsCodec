@@ -40,9 +40,8 @@ function Expand-CharacterActionsFromRagsFile {
     files, one per exact name. The database orders values
     case-insensitively, so rows of such characters may interleave in the
     read result; the grouping happens in this handler. Rows of one
-    character appear in the Data sequence in ascending row ID order
-    regardless, and characters whose every row was skipped produce no
-    file.
+    character appear in the Data sequence in read order, and characters
+    whose every row was skipped produce no file.
 
     .PARAMETER OutputPath
     Path of the folder to export the expanded CharacterActions data into.
@@ -81,15 +80,16 @@ function Expand-CharacterActionsFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $characterActionsFolder
     Write-Verbose "Expanding the CharacterActions data into '$characterActionsFolder'."
 
-    # Read all rows of the table, ordered first by Charname and then by row
-    # ID, as documented. The Charname column of the database is collated
-    # case-insensitively, so rows of characters whose names differ only in
-    # character case may interleave here; they are grouped
-    # case-sensitively below, as the documentation pins the Charname values
-    # of the CharacterActions List column case-sensitive (see
-    # docs/data-mapping.md).
+    # Read all rows of the table in the order the database returns them
+    # (the SELECT carries no ORDER BY; the table has no documented sort)
+    # and group the rows case-sensitively below, as the documentation pins
+    # the Charname values of the CharacterActions List column
+    # case-sensitive (see docs/data-mapping.md). The Charname column of
+    # the database is collated case-insensitively, so rows of characters
+    # whose names differ only in character case may interleave in the
+    # read result.
     Write-Verbose 'Reading the CharacterActions rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Charname], [Data] FROM [CharacterActions] ORDER BY [Charname] ASC, [ID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Charname], [Data] FROM [CharacterActions]')
     Write-Verbose "Read $($rows.Count) CharacterActions row(s)."
 
     # Group the expanded payloads by the Charname value. The documentation
@@ -98,11 +98,9 @@ function Expand-CharacterActionsFromRagsFile {
     # Server Compact orders values case-insensitively, and PowerShell
     # hashtables normalize keys case-insensitively as well). Names and
     # payload lists are kept as parallel lists so that the name lookup
-    # below can compare ordinally. For a fixed exact name the rows arrive
-    # in ascending ID order (the SQL sort is a total order and equal exact
-    # names are only separated by their row IDs), so appending each
-    # expanded payload to its group as the rows arrive preserves the
-    # documented row order within every group.
+    # below can compare ordinally. Appending each expanded payload to its
+    # group as the rows arrive preserves the read order within every
+    # group.
     $groupNames = [System.Collections.Generic.List[string]]::new()
     $groupPayloads = [System.Collections.Generic.List[object]]::new()
 

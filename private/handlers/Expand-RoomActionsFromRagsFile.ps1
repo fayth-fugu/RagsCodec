@@ -42,12 +42,12 @@ function Expand-RoomActionsFromRagsFile {
     lowercased form of the value, and the skip warnings, the merge warning
     and the corrupt-payload throw all cite that lowercased form as well.
     Rows whose raw RoomID values differ only in character case therefore
-    share one file (a case mate with the lowest row ID is read first,
-    since the table is sorted by RoomID and then by row ID). Every merged
-    row whose raw RoomID value differs from the first-read raw value of
-    its case mate set is reported with a warning; its payload is appended
-    to the same Data sequence. The first-read row of such a set and rows
-    repeating its raw value merge without a warning.
+    share one file (the case mate whose raw casing is read first opens
+    the file, the first read row of the unsorted read result). Every
+    merged row whose raw RoomID value differs from the first-read raw
+    value of its case mate set is reported with a warning; its payload is
+    appended to the same Data sequence. The first-read row of such a set
+    and rows repeating its raw value merge without a warning.
 
     A row whose non-empty Data value cannot be expanded aborts the whole
     operation with an exception before any YAML file is written (all
@@ -55,9 +55,9 @@ function Expand-RoomActionsFromRagsFile {
 
     The subfolder and its parent folders are created silently when missing,
     and written files silently overwrite existing ones. Rows of one room
-    appear in the Data sequence in ascending row ID order. When the table
-    is empty altogether (or every row of it was skipped), the empty
-    'RoomActions' subfolder is still created and holds no YAML file.
+    appear in the Data sequence in read order. When the table is empty
+    altogether (or every row of it was skipped), the empty 'RoomActions'
+    subfolder is still created and holds no YAML file.
 
     .PARAMETER OutputPath
     Path of the folder to export the expanded RoomActions data into.
@@ -98,22 +98,21 @@ function Expand-RoomActionsFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $roomActionsFolder
     Write-Verbose "Expanding the RoomActions data into '$roomActionsFolder'."
 
-    # Read all rows of the table, ordered first by RoomID and then by row
-    # ID, as documented ('Table is sorted first by RoomID ascending, then
-    # by ID ascending', docs/data-mapping.md, RoomActions section). The
-    # RoomID column of the database is collated case-insensitively, so
-    # rows of rooms whose names differ only in character case may
-    # interleave here. Contrary to character names, room names are used
-    # as file names directly, so such rows must NOT be grouped
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort). The RoomID column
+    # of the database is collated case-insensitively, so rows of rooms
+    # whose names differ only in character case may return in any
+    # relative order. Contrary to character names, room names are used as
+    # file names directly, so such rows must NOT be grouped
     # case-sensitively: case mates would produce the same Windows file
     # name and silently overwrite each other. They are grouped by the
     # lowercased value below (the List-column values of the RoomActions
     # table are documented as case-insensitive and always coerced to
-    # lowercase in docs/data-mapping.md), keeping every row in ascending
-    # ID order and the first-read value's lowercase form as the file name
-    # and RoomID key.
+    # lowercase in docs/data-mapping.md), keeping every row in read order
+    # and the first-read value's lowercase form as the file name and
+    # RoomID key.
     Write-Verbose 'Reading the RoomActions rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [RoomID], [Data] FROM [RoomActions] ORDER BY [RoomID] ASC, [ID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [RoomID], [Data] FROM [RoomActions]')
     Write-Verbose "Read $($rows.Count) RoomActions row(s)."
 
     # Characters that are invalid in file names on the current file system.
@@ -132,11 +131,9 @@ function Expand-RoomActionsFromRagsFile {
     # the canonical names name the written file and its RoomID key, the
     # raw names drive the merge warning (a row whose raw value differs
     # from the first-read raw value of its group is reported), and the
-    # payload lists receive the expanded payloads. For a fixed canonical
-    # value the rows arrive in ascending ID order (the SQL sort is a total
-    # order within a set of case mates, separated by row IDs), so
-    # appending each expanded payload to its group as the rows arrive
-    # preserves the documented row order within every group.
+    # payload lists receive the expanded payloads. Appending each
+    # expanded payload to its group as the rows arrive preserves the read
+    # order within every group.
     $groupNames = [System.Collections.Generic.List[string]]::new()
     $groupRawNames = [System.Collections.Generic.List[string]]::new()
     $groupPayloads = [System.Collections.Generic.List[object]]::new()

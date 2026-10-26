@@ -15,18 +15,18 @@ function Expand-StatusBarItemsFromRagsFile {
     The written YAML file holds a top-level 'StatusBarItems' mapping whose
     value is a sequence with one entry per status bar item, each mapping
     the non-excluded columns of the StatusBarItems table: the Name key, the
-    Text value, the Width value and the Visible value. Rows are sorted by
-    row ID and then by Name before they are read, as documented ("Table is
-    sorted first by ID ascending, then by Name ascending",
-    docs/data-mapping.md, StatusBarItems section). A null string column
+    Text value, the Width value and the Visible value. Rows are read in
+    the order the database returns them (the SELECT carries no ORDER BY;
+    the table has no documented sort). A null string column
     value (the Name key and the Text value) is emitted as the empty
     string; a null Width value is emitted as a YAML null; and the Visible
     bit column would emit $false for a null value (though the column is
     NOT NULL in the schema, so a null never occurs through the documented
     data path).
 
-    Rows are expected to hold distinct Name values: the table is sorted by
-    row ID before it is read, so for every row after the first whose Name
+    Rows are expected to hold distinct Name values: rows are read in the
+    order the database returns them, so for every row after the first
+    whose Name
     compares equal to a previously read row — ignoring character case, per
     the 'Values are case-insensitive' / 'Only the first detected casing
     will be read' Unique handling documented for the table (see the
@@ -96,16 +96,14 @@ function Expand-StatusBarItemsFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the StatusBarItems data into '$OutputPath'."
 
-    # Read all rows of the table, ordered by row ID and then by Name
-    # ("Table is sorted first by ID ascending, then by Name ascending",
-    # docs/data-mapping.md, StatusBarItems section). The Name column of the
-    # database is collated case-insensitively, so rows whose names differ
-    # only in character case sort next to each other and tie-break on
-    # their row ID; duplicates among them are dropped case-insensitively
-    # below, in the read order of the rows, so the row of the lowest ID
-    # within case mates wins.
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort). The Name column of
+    # the database is collated case-insensitively, so rows whose names
+    # differ only in character case may return adjacent to each other;
+    # duplicates among them are dropped case-insensitively below, in the
+    # read order of the rows, so the first read row wins.
     Write-Verbose 'Reading the StatusBarItems rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Name], [Text], [Width], [Visible] FROM [StatusBarItems] ORDER BY [ID] ASC, [Name] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Name], [Text], [Width], [Visible] FROM [StatusBarItems]')
     Write-Verbose "Read $($rows.Count) StatusBarItems row(s)."
 
     # The staged Name values of the status bar items whose entries were

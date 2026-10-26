@@ -27,11 +27,10 @@ function Expand-RoomExitsFromRagsFile {
     docs/data-mapping.md, RoomExits section): after the null and empty
     checks, the value is lowercased with ToLowerInvariant, so the
     entry's RoomID key is always the lowercase form of the value. The
-    case mate whose raw casing is read first (which is the case mate
-    with the lowest Direction and then the lowest row ID, since the
-    table is sorted by RoomID, then by Direction and then by row ID)
-    opens the entry, and every later row whose raw RoomID value differs
-    from that first-read raw value only in character case is merged
+    case mate whose raw casing is read first (the first read row of the
+    unsorted read result) opens the entry, and every later row whose raw
+    RoomID value differs from that first-read raw value only in character
+    case is merged
     into the entry with a warning describing the merge; its exit is
     written into the same Direction sequence. Every warning and verbose
     message of the expansion cites the lowercased RoomID value.
@@ -44,11 +43,9 @@ function Expand-RoomExitsFromRagsFile {
     with a warning (the column values of the first read row win; 'If
     multiple identical Directions exist for the same RoomID value, then
     only the first row's column values will be read',
-    docs/data-mapping.md, RoomExits section): all rows are sorted first
-    by RoomID, then by Direction and then by row ID, which both orders
-    the reported rows and makes the winning row of such a duplicate
-    deterministic. Direction values of different rooms are independent
-    and never compared against each other.
+    docs/data-mapping.md, RoomExits section; the first read row being the
+    first row of the unsorted read result). Direction values of different
+    rooms are independent and never compared against each other.
 
     The Active column holds the two boolean states; a null Active value
     is read as $false. The DestinationRoom value is always normalized
@@ -65,9 +62,8 @@ function Expand-RoomExitsFromRagsFile {
 
     The output folder is silently created when it is missing and the
     written file silently overwrites any existing one. Rows of one room
-    appear in the Direction sequence in ascending Direction and row ID
-    order. An empty table expands to a top-level empty 'RoomExits'
-    sequence.
+    appear in the Direction sequence in read order. An empty table
+    expands to a top-level empty 'RoomExits' sequence.
 
     .PARAMETER OutputPath
     Path of the folder to export the expanded RoomExits data into.
@@ -106,15 +102,13 @@ function Expand-RoomExitsFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the RoomExits data into '$OutputPath'."
 
-    # Read all rows of the table, ordered first by RoomID, then by
-    # Direction and then by row ID ('Table is sorted first by RoomID
-    # ascending, then by Direction ascending, then by ID ascending',
-    # docs/data-mapping.md, RoomExits section). The RoomID column of the
-    # database is collated case-insensitively, so rows whose values
-    # differ only in character case may interleave here and sort next to
-    # each other, separated by their Direction and row ID values.
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort). The RoomID column
+    # of the database is collated case-insensitively, so rows whose
+    # values differ only in character case may interleave in the read
+    # result.
     Write-Verbose 'Reading the RoomExits rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [RoomID], [Direction], [Active], [DestinationRoom], [PortalObjectName] FROM [RoomExits] ORDER BY [RoomID] ASC, [Direction] ASC, [ID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [RoomID], [Direction], [Active], [DestinationRoom], [PortalObjectName] FROM [RoomExits]')
     Write-Verbose "Read $($rows.Count) RoomExits row(s)."
 
     # Group the rows by their lowercased RoomID value ('Always coerced
@@ -126,12 +120,9 @@ function Expand-RoomExitsFromRagsFile {
     # below can detect the rows whose raw casing differs from the
     # first-read one. Group names, first-read raw names and per-room
     # exit lists are kept as parallel lists, while the duplicate check
-    # further down compares Direction values with integer equality. For
-    # a fixed lowercased room the rows arrive in ascending Direction and
-    # row ID order (the SQL sort is a total order within a set of case
-    # mates, separated by their Direction and row ID values), so
-    # processing each row as it arrives preserves the documented row
-    # order within every group.
+    # further down compares Direction values with integer equality.
+    # Processing each row as it arrives preserves the read order within
+    # every group.
     $groupNames = [System.Collections.Generic.List[string]]::new()
     $groupRawNames = [System.Collections.Generic.List[string]]::new()
     $groupExits = [System.Collections.Generic.List[object]]::new()
@@ -299,9 +290,8 @@ function Expand-RoomExitsFromRagsFile {
         })
     }
 
-    # Build the top-level entry list, one entry per room in first-row
-    # order (= ascending lowercased RoomID of the case-insensitive
-    # group names, from the SQL sort).
+    # Build the top-level entry list, one entry per room in first-read
+    # order.
     $entries = [System.Collections.Generic.List[object]]::new()
     for ($groupIndex = 0; $groupIndex -lt $groupNames.Count; $groupIndex++) {
         $entries.Add([ordered]@{

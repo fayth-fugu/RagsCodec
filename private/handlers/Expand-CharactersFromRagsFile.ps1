@@ -26,11 +26,12 @@ function Expand-CharactersFromRagsFile {
     CurrentRoom, Description and CharPortrait), which are emitted as the
     empty string.
 
-    Rows are expected to hold distinct Charname values: the table is
-    sorted by Charname ascending, as documented for the 'Characters' table
-    in docs/data-mapping.md, so for every character after the first whose
-    Charname compares equal to a previously read character, ignoring
-    character case, the second and later rows are skipped with a warning
+    Rows are expected to hold distinct Charname values: rows are read in
+    the order the database returns them (the SELECT carries no ORDER BY;
+    the table has no documented sort), so for every character after the
+    first whose Charname compares equal to a previously read character,
+    ignoring character case, the second and later rows are skipped with a
+    warning
     which names the column values of the ignored duplicate row — the
     column values of the first read row win. The duplicate comparison is
     case-insensitive as documented ('Values are case-insensitive'; only
@@ -79,16 +80,14 @@ function Expand-CharactersFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the Characters data into '$OutputPath'."
 
-    # Read all rows of the table, ordered by Charname ascending, as
-    # documented for the 'Characters' table in docs/data-mapping.md. The
-    # Charname column of the database is collated case-insensitively, so
-    # rows of characters whose names differ only in character case sort
-    # next to each other here (with no identity column in the SELECT,
-    # their relative read order is the engine's tiebreak); duplicates
-    # among them are dropped case-insensitively below, in the read order
-    # of the rows.
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort). The Charname column
+    # of the database is collated case-insensitively, so rows of
+    # characters whose names differ only in character case may return in
+    # any relative order; duplicates among them are dropped
+    # case-insensitively below, in the read order of the rows.
     Write-Verbose 'Reading the Characters rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [Charname], [CharnameOverride], [CharGender], [CurrentRoom], [Description], [AllowInventoryInteraction], [EnterFirstTime], [LeaveFirstTime], [CharPortrait] FROM [Characters] ORDER BY [Charname] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [Charname], [CharnameOverride], [CharGender], [CurrentRoom], [Description], [AllowInventoryInteraction], [EnterFirstTime], [LeaveFirstTime], [CharPortrait] FROM [Characters]')
     Write-Verbose "Read $($rows.Count) Characters row(s)."
 
     # The Characters table has no identity column which could label the

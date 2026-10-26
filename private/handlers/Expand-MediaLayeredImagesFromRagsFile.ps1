@@ -27,10 +27,9 @@ function Expand-MediaLayeredImagesFromRagsFile {
     lowercase', docs/data-mapping.md, MediaLayeredImages section): after
     the null and empty checks, the value is lowercased with
     ToLowerInvariant, so the entry's MediaName key is always the lowercase
-    form of the value. The case mate whose raw casing is read first (which
-    is the case mate with the lowest Order and then the lowest row ID,
-    since the table is sorted by MediaName, then by Order and then by row
-    ID) opens the entry, and every later row whose raw MediaName value
+    form of the value. The case mate whose raw casing is read first (the
+    first read row of the unsorted read result) opens the entry, and
+    every later row whose raw MediaName value
     differs from that first-read raw value only in character case is
     merged into the entry with a warning describing the merge; its layer
     is written into the same Order sequence. Every warning and verbose
@@ -43,16 +42,15 @@ function Expand-MediaLayeredImagesFromRagsFile {
     from them. Rows with a null Order value are skipped with a warning,
     as no layer can be derived from them. Rows within one media name
     which repeat an exact, previously read Order value are also skipped
-    with a warning (the Data of the first read row wins): all rows are
-    sorted first by MediaName, then by Order and then by row ID, which
-    both orders the reported rows and makes the winning row of such a
-    duplicate deterministic. Order values of different media names are
-    independent and never compared against each other.
+    with a warning (the Data of the first read row wins, the first read
+    row being the first row of the unsorted read result). Order values of
+    different media names are independent and never compared against each
+    other.
 
     The output folder is silently created when it is missing and the
     written file silently overwrites any existing one. Rows of one media
-    name appear in the Order sequence in ascending Order and row ID order.
-    An empty table expands to a top-level empty 'MediaLayeredImages'
+    name appear in the Order sequence in read order. An empty table
+    expands to a top-level empty 'MediaLayeredImages'
     sequence.
 
     .PARAMETER OutputPath
@@ -93,15 +91,13 @@ function Expand-MediaLayeredImagesFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the MediaLayeredImages data into '$OutputPath'."
 
-    # Read all rows of the table, ordered first by MediaName, then by
-    # Order and then by row ID ('Table is sorted first by MediaName
-    # ascending, then by Order ascending, then by ID ascending',
-    # docs/data-mapping.md, MediaLayeredImages section). The MediaName
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort). The MediaName
     # column of the database is collated case-insensitively, so rows whose
-    # values differ only in character case may interleave here and sort
-    # next to each other, separated by their Order and row ID values.
+    # values differ only in character case may interleave in the read
+    # result.
     Write-Verbose 'Reading the MediaLayeredImages rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [MediaName], [Order], [Data] FROM [MediaLayeredImages] ORDER BY [MediaName] ASC, [Order] ASC, [ID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [MediaName], [Order], [Data] FROM [MediaLayeredImages]')
     Write-Verbose "Read $($rows.Count) MediaLayeredImages row(s)."
 
     # Group the rows by their lowercased MediaName value ('Always coerced
@@ -113,11 +109,8 @@ function Expand-MediaLayeredImagesFromRagsFile {
     # detect the rows whose raw casing differs from the first-read one.
     # Group names, first-read raw names and per-media layer lists are kept
     # as parallel lists, while the duplicate check further down compares
-    # Order values with integer equality. For a fixed lowercased media
-    # name the rows arrive in ascending Order and row ID order (the SQL
-    # sort is a total order within a set of case mates, separated by their
-    # Order and row ID values), so processing each row as it arrives
-    # preserves the documented row order within every group.
+    # Order values with integer equality. Processing each row as it
+    # arrives preserves the read order within every group.
     $groupNames = [System.Collections.Generic.List[string]]::new()
     $groupRawNames = [System.Collections.Generic.List[string]]::new()
     $groupLayers = [System.Collections.Generic.List[object]]::new()
@@ -224,8 +217,7 @@ function Expand-MediaLayeredImagesFromRagsFile {
     }
 
     # Build the top-level entry list, one entry per media name in
-    # first-row order (= ascending lowercased MediaName of the
-    # case-insensitive group names, from the SQL sort).
+    # first-read order.
     $entries = [System.Collections.Generic.List[object]]::new()
     for ($groupIndex = 0; $groupIndex -lt $groupNames.Count; $groupIndex++) {
         $entries.Add([ordered]@{

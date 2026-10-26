@@ -20,12 +20,11 @@ function Compress-CharacterPropertiesIntoRagsFile {
     mappings holding the property Name and its Value. One table row is
     appended per property (the Identity column value is supplied by the
     database), replicating the row order of the original expansion — the
-    table is sorted first by Charname, then by Name and then by row ID,
-    as documented for the 'CharacterProperties' table in
-    docs/data-mapping.md: entries keep their YAML sequence order and the
-    properties of every entry keep their YAML sequence order, so
-    re-expanding the file restores the entries and their properties in
-    ascending row ID order.
+    rows are read in the order the database returns them (the SELECT
+    carries no ORDER BY; the table has no documented sort): entries keep
+    their YAML sequence order and the properties of every entry keep
+    their YAML sequence order, so re-expanding the file restores the
+    entries and their properties in read order.
 
     The 'CharacterProperties.yaml' file is consumed as follows:
     - A file from which the YAML parser can produce no document at all (a

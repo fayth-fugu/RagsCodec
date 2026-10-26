@@ -24,7 +24,7 @@ function Compress-MediaLayeredImagesIntoRagsFile {
     replicating the row order of the original expansion: the layers of
     every entry keep their YAML sequence order, and entries keep their
     YAML sequence order, so re-expanding the file restores the entries
-    and their layers in ascending row ID order.
+    and their layers in read order.
 
     The 'MediaLayeredImages.yaml' file is consumed as follows:
     - A file which defines more than one YAML document is consumed from

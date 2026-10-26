@@ -15,15 +15,15 @@ function Expand-MediaGroupsFromRagsFile {
     The written YAML file holds a top-level 'MediaGroups' mapping whose value
     is a sequence with one entry per media group, each mapping the non-excluded
     columns of the MediaGroups table: the Name key and the Parent column value.
-    Rows are sorted by Name and then by row ID before they are read, as
-    documented ("Table is sorted first by Name ascending, then by ID
-    ascending", docs/data-mapping.md, MediaGroups section). A null Parent
+    Rows are read in the order the database returns them (the SELECT
+    carries no ORDER BY; the table has no documented sort). A null Parent
     value is emitted as the empty string; every other null column value is
     emitted as a YAML null.
 
-    Rows are expected to hold distinct Name values: the table is sorted by
-    Name before it is read, so for every row after the first whose Name
-    compares equal to a previously read row — ignoring character case, per
+    Rows are expected to hold distinct Name values: rows are read in the
+    order the database returns them, so for every row after the first
+    whose Name compares equal to a previously read row — ignoring
+    character case, per
     the 'Values are case-insensitive' / 'Only the first detected casing
     will be read' Unique handling documented for the table (see the
     MediaGroups section of docs/data-mapping.md) — the second and later
@@ -75,16 +75,14 @@ function Expand-MediaGroupsFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the MediaGroups data into '$OutputPath'."
 
-    # Read all rows of the table, ordered by Name and then by row ID
-    # ("Table is sorted first by Name ascending, then by ID ascending",
-    # docs/data-mapping.md, MediaGroups section). The Name column of the
-    # database is collated case-insensitively, so rows whose names differ
-    # only in character case sort next to each other and tie-break on
-    # their row ID; duplicates among them are dropped case-insensitively
-    # below, in the read order of the rows, so the row of the lowest ID
-    # within case mates wins.
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort). The Name column of
+    # the database is collated case-insensitively, so rows whose names
+    # differ only in character case may return adjacent to each other;
+    # duplicates among them are dropped case-insensitively below, in the
+    # read order of the rows, so the first read row wins.
     Write-Verbose 'Reading the MediaGroups rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Name], [Parent] FROM [MediaGroups] ORDER BY [Name] ASC, [ID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Name], [Parent] FROM [MediaGroups]')
     Write-Verbose "Read $($rows.Count) MediaGroups row(s)."
 
     # The Name values of the media groups whose entries were built, kept in a

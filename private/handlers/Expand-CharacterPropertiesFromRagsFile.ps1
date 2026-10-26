@@ -38,10 +38,9 @@ function Expand-CharacterPropertiesFromRagsFile {
     expected to contain only distinct values and are case-sensitive), rows
     within one character which repeat an exact, previously read property
     Name are also skipped with a warning (the Value of the first read row
-    wins): all rows are sorted first by Charname, then by Name and then by
-    row ID, which both orders the reported rows and makes the winning row
-    of such a duplicate deterministic. Property names which differ only in
-    character case are distinct properties and never considered duplicates.
+    wins, the first read row being the first row of the unsorted read
+    result). Property names which differ only in character case are
+    distinct properties and never considered duplicates.
 
     The output folder is silently created when it is missing and the written
     file silently overwrites any existing one. An empty table expands to a
@@ -85,14 +84,14 @@ function Expand-CharacterPropertiesFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the CharacterProperties data into '$OutputPath'."
 
-    # Read all rows of the table, ordered first by Charname, then by Name
-    # and then by row ID, as documented in docs/data-mapping.md. The
-    # Charname and Name columns of the database are collated
+    # Read all rows of the table in the order the database returns them
+    # (the SELECT carries no ORDER BY; the table has no documented sort).
+    # The Charname and Name columns of the database are collated
     # case-insensitively, so rows whose values differ only in character
-    # case may interleave here and sort next to each other; both cases are
-    # handled case-sensitively below.
+    # case may interleave in the read result; both cases are handled
+    # case-sensitively below.
     Write-Verbose 'Reading the CharacterProperties rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Charname], [Name], [Value] FROM [CharacterProperties] ORDER BY [Charname] ASC, [Name] ASC, [ID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Charname], [Name], [Value] FROM [CharacterProperties]')
     Write-Verbose "Read $($rows.Count) CharacterProperties row(s)."
 
     # Group the rows by the exact Charname value case-sensitively, as
@@ -101,11 +100,8 @@ function Expand-CharacterPropertiesFromRagsFile {
     # Server Compact orders values case-insensitively and PowerShell
     # hashtables normalize keys case-insensitively as well; names and
     # property entries are kept as parallel lists so that the name lookup
-    # below can compare ordinally.
-    # For a fixed exact name the rows arrive in ascending Name and row ID
-    # order (the SQL sort is a total order and equal exact names are only
-    # separated by their row IDs), so processing each row as it arrives
-    # preserves the documented row order within every group.
+    # below can compare ordinally. Processing each row as it arrives
+    # preserves the read order within every group.
     $groupNames = [System.Collections.Generic.List[string]]::new()
     $groupProperties = [System.Collections.Generic.List[object]]::new()
 
@@ -192,8 +188,8 @@ function Expand-CharacterPropertiesFromRagsFile {
         })
     }
 
-    # Build the top-level entry list, one entry per character in first-row
-    # order (= ascending Charname of the exact names, from the SQL sort).
+    # Build the top-level entry list, one entry per character in
+    # first-read order.
     $entries = [System.Collections.Generic.List[object]]::new()
     for ($groupIndex = 0; $groupIndex -lt $groupNames.Count; $groupIndex++) {
         $entries.Add([ordered]@{

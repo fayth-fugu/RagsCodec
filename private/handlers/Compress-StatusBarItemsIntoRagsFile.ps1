@@ -20,10 +20,10 @@ function Compress-StatusBarItemsIntoRagsFile {
     documented Unique column), the Text value, the Width value and the
     Visible value. One table row is appended per status bar item entry,
     replicating the row order of the original expansion: entries keep
-    their YAML sequence order, which is the ascending ID order of the
-    original table read, as documented for the 'StatusBarItems' table in
-    docs/data-mapping.md (the new rows receive freshly generated identity
-    IDs, as the ID column is excluded from the expansion).
+    their YAML sequence order, which is the order the database returns
+    them (the SELECT carries no ORDER BY; the table has no documented
+    sort; the new rows receive freshly generated identity IDs, as the
+    ID column is excluded from the expansion).
 
     The 'StatusBarItems.yaml' file is consumed as follows:
 

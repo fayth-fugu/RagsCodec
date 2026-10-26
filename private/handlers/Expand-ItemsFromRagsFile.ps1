@@ -26,11 +26,11 @@ function Expand-ItemsFromRagsFile {
     (Name, Description, SDesc, Preposition, LocationName and GroupName),
     which are emitted as the empty string.
 
-    Rows are expected to hold distinct UniqueID values: the table is
-    sorted by UniqueID ascending before it is read ("Table is sorted by
-    UniqueID ascending", docs/data-mapping.md, Items section), so for
-    every item after the first whose UniqueID compares equal to a
-    previously read item — ignoring character case and always coerced to
+    Rows are expected to hold distinct UniqueID values: rows are read in
+    the order the database returns them (the SELECT carries no ORDER BY;
+    the table has no documented sort), so for every item after the
+    first whose UniqueID compares equal to a previously read item —
+    ignoring character case and always coerced to
     lowercase, per the 'Values are case-insensitive' / 'Always coerced
     to lowercase' Unique handling documented for the table (see the
     Items section of docs/data-mapping.md) — the second and later rows
@@ -83,17 +83,15 @@ function Expand-ItemsFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the Items data into '$OutputPath'."
 
-    # Read all rows of the table, ordered by UniqueID ascending ("Table
-    # is sorted by UniqueID ascending", docs/data-mapping.md, Items
-    # section; the SELECT omits the ID column, so the documented sort
-    # ends here). The UniqueID column of the database is collated
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort; the SELECT omits the
+    # ID column). The UniqueID column of the database is collated
     # case-insensitively, so rows of items whose UniqueID values differ
-    # only in character case sort next to each other here (their
-    # relative read order is the engine's tiebreak); duplicates among
-    # them are dropped case-insensitively below, in the read order of
-    # the rows.
+    # only in character case may return in any relative order; duplicates
+    # among them are dropped case-insensitively below, in the read order
+    # of the rows.
     Write-Verbose 'Reading the Items rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [UniqueID], [Name], [Description], [SDesc], [Preposition], [LocationName], [LocationType], [Carryable], [Wearable], [Openable], [Lockable], [Enterable], [Readable], [Container], [Weight], [Worn], [Read], [Locked], [Open], [Entered], [Visible], [EnterFirstTime], [LeaveFirstTime], [GroupName], [Important] FROM [Items] ORDER BY [UniqueID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [UniqueID], [Name], [Description], [SDesc], [Preposition], [LocationName], [LocationType], [Carryable], [Wearable], [Openable], [Lockable], [Enterable], [Readable], [Container], [Weight], [Worn], [Read], [Locked], [Open], [Entered], [Visible], [EnterFirstTime], [LeaveFirstTime], [GroupName], [Important] FROM [Items]')
     Write-Verbose "Read $($rows.Count) Items row(s)."
 
     # The Items table has no identity column which could label the rows of

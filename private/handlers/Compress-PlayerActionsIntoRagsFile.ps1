@@ -25,7 +25,7 @@ function Compress-PlayerActionsIntoRagsFile {
     of the original expansion: the entries of the file keep their YAML
     sequence order and the Identity values of the appended rows grow in
     insertion order, so re-expanding the appended data restores the
-    entries in the documented ascending row ID order.
+    entries in read order.
 
     The YAML file is consumed as follows:
     - A mapping defining keys other than 'Data' is accepted with one
@@ -65,8 +65,10 @@ function Compress-PlayerActionsIntoRagsFile {
     inside a transaction, so a failure while appending leaves no
     partially appended data behind.
 
-    The documented expansion sorts the table by ID ascending and writes
-    its payloads into one bare Data sequence; no other machinery applies.
+    The expansion reads the rows in the order the database returns them
+    (the SELECT carries no ORDER BY; the table has no documented sort)
+    and writes its payloads into one bare Data sequence; no other
+    machinery applies.
     The PlayerActions table carries no List, Unique or Exclude column
     besides its Exclude identity column, so no grouping, name handling,
     duplicate rule, casing rule or truncation exists: every meaningful

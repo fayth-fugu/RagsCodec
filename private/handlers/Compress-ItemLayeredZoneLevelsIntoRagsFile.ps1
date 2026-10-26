@@ -23,10 +23,11 @@ function Compress-ItemLayeredZoneLevelsIntoRagsFile {
     is appended per Data sequence entry (the ID identity column is excluded
     and auto-supplied by the database), replicating the row order of the
     original expansion: an item's values keep the entry order of its Data
-    sequence, which is the ascending row ID order of the original table
-    read, and entries keep their YAML sequence order, which is the
-    ascending ItemID order of the original table read (with every set of
-    case-mate items merged into the lowercased item identity).
+    sequence, which is the read order of the original table, and entries
+    keep their YAML sequence order, which is the order the database
+    returns them (the SELECT carries no ORDER BY; the table has no
+    documented sort; every set of case-mate items is merged into the
+    lowercased item identity).
 
     The 'ItemLayeredZoneLevels.yaml' file is consumed as follows:
     - A file which defines more than one YAML document is consumed from

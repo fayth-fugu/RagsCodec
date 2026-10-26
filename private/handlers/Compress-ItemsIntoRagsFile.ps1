@@ -20,9 +20,8 @@ function Compress-ItemsIntoRagsFile {
     twenty-four column values. One table row is appended per item entry
     (the Items table holds no identity column), replicating the row
     order of the original expansion: entries keep their YAML sequence
-    order, which is the ascending UniqueID order of the original table
-    read ('Table is sorted by UniqueID ascending',
-    docs/data-mapping.md, Items section).
+    order, which is the order the database returns them (the SELECT
+    carries no ORDER BY; the table has no documented sort).
 
     The 'Items.yaml' file is consumed as follows:
     - A file which defines more than one YAML document is consumed from

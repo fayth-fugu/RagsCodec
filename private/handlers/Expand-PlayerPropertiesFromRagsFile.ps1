@@ -15,15 +15,15 @@ function Expand-PlayerPropertiesFromRagsFile {
     The written YAML file holds a top-level 'PlayerProperties' mapping whose value
     is a sequence with one entry per player property, each mapping the non-excluded
     columns of the PlayerProperties table: the Name key and the Value column value.
-    Rows are sorted by Name and then by row ID before they are read, as
-    documented ("Table is sorted first by Name ascending, then by ID
-    ascending", docs/data-mapping.md, PlayerProperties section). A null Value
+    Rows are read in the order the database returns them (the SELECT
+    carries no ORDER BY; the table has no documented sort). A null Value
     value is emitted as the empty string; every other null column value is
     emitted as a YAML null.
 
-    Rows are expected to hold distinct Name values: the table is sorted by
-    Name before it is read, so for every row after the first whose Name
-    compares equal to a previously read row — comparing character case, per
+    Rows are expected to hold distinct Name values: rows are read in the
+    order the database returns them, so for every row after the first
+    whose Name compares equal to a previously read row — comparing
+    character case, per
     the 'Values are case-sensitive' Unique handling documented for the table
     (see the PlayerProperties section of docs/data-mapping.md) — the second and
     later rows of the pair are skipped with a warning which contains the column
@@ -74,17 +74,16 @@ function Expand-PlayerPropertiesFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the PlayerProperties data into '$OutputPath'."
 
-    # Read all rows of the table, ordered by Name and then by row ID
-    # ("Table is sorted first by Name ascending, then by ID ascending",
-    # docs/data-mapping.md, PlayerProperties section). The Name column of the
-    # database is collated case-insensitively, so rows whose names differ
-    # only in character case sort next to each other and tie-break on
-    # their row ID; duplicates among them are dropped case-SENSITIVELY
-    # below, in the read order of the rows, so the row of the lowest ID
-    # among identical names wins and names which differ only in
-    # character case produce distinct entries.
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort). The Name column of
+    # the database is collated case-insensitively, so rows whose names
+    # differ only in character case may return adjacent to each other;
+    # duplicates among them are dropped case-SENSITIVELY below, in the
+    # read order of the rows, so the first read row among identical names
+    # wins and names which differ only in character case produce distinct
+    # entries.
     Write-Verbose 'Reading the PlayerProperties rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Name], [Value] FROM [PlayerProperties] ORDER BY [Name] ASC, [ID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Name], [Value] FROM [PlayerProperties]')
     Write-Verbose "Read $($rows.Count) PlayerProperties row(s)."
 
     # The Name values of the player properties whose entries were built, kept

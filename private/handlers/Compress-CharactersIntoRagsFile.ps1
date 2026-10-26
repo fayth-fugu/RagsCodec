@@ -20,8 +20,8 @@ function Compress-CharactersIntoRagsFile {
     values. One table row is appended per character entry (the Characters
     table holds no identity column), replicating the row order of the
     original expansion: entries keep their YAML sequence order, which is
-    the ascending Charname order of the original table read, as
-    documented for the 'Characters' table in docs/data-mapping.md.
+    the order the database returns them (the SELECT carries no ORDER BY;
+    the table has no documented sort).
 
     The 'Characters.yaml' file is consumed as follows:
     - A file which defines more than one YAML document is consumed from

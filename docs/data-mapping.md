@@ -17,8 +17,7 @@
   - **Maximum one** `List` **column per table**
 - Columns tagged with the `Unique` handling instruction are expected to **contain only distinct values**
   - This is *soft-validated* during expansion — a warning is shown if duplicate values are detected
-    - Tables are sorted before expansion and only the *first duplicate entry* is read
-      - Refer to individual tables below for sorting conditions
+    - Only the *first duplicate entry* is read
   - **Maximum one** `Unique` **column per table**
 - Columns tagged with the `Xml` handling instruction may contain XML data (with no XML declaration)
   - Data in these columns are *pretty-printed* during expansion, then *linearized* during compression
@@ -94,7 +93,6 @@
   - `List`-column handling: A YAML file is created for each distinct `Charname` value with the naming convention `{GUID}.yaml`
     - The `GUID` value is derived from `Charname` as described above
     - Values are *case-sensitive*
-  - Table is sorted first by `Charname` ascending, then by `ID` ascending
   - `RagsAction`-column handling: All `Data` rows for each `Charname` are extracted using `RagsAction` expansion
   - Sample structure of each `{GUID}.yaml` file:
     ```yaml
@@ -107,7 +105,6 @@
   - Expanded into a single file — `CharacterProperties.yaml`
   - `List`-column handling: Each distinct `Charname` value starts a new entry in the top-level YAML sequence
     - Values are *case-sensitive*
-  - Table is sorted first by `Charname` ascending, then by `Name` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist for the same `Charname` value, then only the `Value` of the first row will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are *case-sensitive*
@@ -129,7 +126,6 @@
     ```
 - `Characters`
   - Expanded into a single file — `Characters.yaml`
-  - Table is sorted by `Charname` ascending
   - `Unique`-column handling: If multiple identical `Charname`s exist, then only the first row's column values will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are **case-insensitive**
@@ -193,7 +189,6 @@
   - `List`-column handling: A YAML file is created for each distinct `ItemID` value with the naming convention `{ItemID}.yaml`
     - Values are **case-insensitive**
       - Always coerced to lowercase
-  - Table is sorted first by `ItemID` ascending, then by `ID` ascending
   - `RagsAction`-column handling: All `Data` rows for each `ItemID` are extracted using `RagsAction` expansion
   - Sample structure of each `{ItemID}.yaml` file:
     ```yaml
@@ -204,7 +199,6 @@
     ```
 - `ItemGroups`
   - Expanded into a single file — `ItemGroups.yaml`
-  - Table is sorted first by `Name` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist, then only the `Parent` of the first row will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are **case-insensitive**
@@ -222,7 +216,6 @@
   - `List`-column handling: Each distinct `ItemID` value starts a new entry in the top-level YAML sequence
     - Values are **case-insensitive**
       - Always coerced to lowercase
-  - Table is sorted first by `ItemID` ascending, then by `ID` ascending
   - Sample structure of an `ItemLayeredZoneLevels.yaml` file:
     ```yaml
     ItemLayeredZoneLevels:
@@ -240,7 +233,6 @@
   - `List`-column handling: Each distinct `ItemID` value starts a new entry in the top-level YAML sequence
     - Values are **case-insensitive**
       - Always coerced to lowercase
-  - Table is sorted first by `ItemID` ascending, then by `Name` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist for the same `ItemID` value, then only the `Value` of the first row will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are *case-sensitive*
@@ -262,7 +254,6 @@
     ```
 - `Items`
   - Expanded into a single file — `Items.yaml`
-  - Table is sorted by `UniqueID` ascending
   - `Unique`-column handling: If multiple identical `UniqueID`s exist, then only the first row's column values will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are **case-insensitive**
@@ -325,7 +316,6 @@
     ```
 - `Media`
   - Expanded into a subfolder — `Media/`
-  - Table is sorted by `Name` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist, then only the first row's column values will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
       - The value of the `Data` column will not be shown in the warning
@@ -347,7 +337,6 @@
     ```
 - `MediaGroups`
   - Expanded into a single file — `MediaGroups.yaml`
-  - Table is sorted first by `Name` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist, then only the `Parent` of the first row will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are **case-insensitive**
@@ -365,7 +354,6 @@
   - `List`-column handling: Each distinct `MediaName` value starts a new entry in the top-level YAML sequence
     - Values are **case-insensitive**
       - Always coerced to lowercase
-  - Table is sorted first by `MediaName` ascending, then by `Order` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Order`s exist for the same `MediaName` value, then only the `Data` of the first row will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
   - Lowercase enforcement: values of these columns will always be coerced to lowercase during expansion and compression:
@@ -409,7 +397,6 @@
     ```
 - `PlayerActions`
   - Expanded into a single file — `PlayerActions.yaml`
-  - Table is sorted by `ID` ascending
   - `RagsAction`-column handling: All `Data` rows are extracted using `RagsAction` expansion
   - Sample structure of a `PlayerActions.yaml` file:
     ```yaml
@@ -419,7 +406,6 @@
     ```
 - `PlayerProperties`
   - Expanded into a single file — `PlayerProperties.yaml`
-  - Table is sorted first by `Name` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist, then only the `Value` of the first row will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are *case-sensitive*
@@ -436,7 +422,6 @@
   - `List`-column handling: A YAML file is created for each distinct `RoomID` value with the naming convention `{RoomID}.yaml`
     - Values are **case-insensitive**
       - Always coerced to lowercase
-  - Table is sorted first by `RoomID` ascending, then by `ID` ascending
   - `RagsAction`-column handling: All `Data` rows for each `RoomID` are extracted using `RagsAction` expansion
   - Sample structure of each `{RoomID}.yaml` file:
     ```yaml
@@ -450,7 +435,6 @@
   - `List`-column handling: Each distinct `RoomID` value starts a new entry in the top-level YAML sequence
     - Values are **case-insensitive**
       - Always coerced to lowercase
-  - Table is sorted first by `RoomID` ascending, then by `Direction` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Direction`s exist for the same `RoomID` value, then only the first row's column values will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
   - Lowercase enforcement: values of these columns will always be coerced to lowercase during expansion and compression:
@@ -486,7 +470,6 @@
   - `List`-column handling: Each distinct `RoomID` value starts a new entry in the top-level YAML sequence
     - Values are **case-insensitive**
       - Always coerced to lowercase
-  - Table is sorted first by `RoomID` ascending, then by `Name` ascending, then by `ID` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist for the same `RoomID` value, then only the `Value` of the first row will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are *case-sensitive*
@@ -508,7 +491,6 @@
     ```
 - `Rooms`
   - Expanded into a single file — `Rooms.yaml`
-  - Table is sorted by `UniqueID` ascending
   - `Unique`-column handling: If multiple identical `UniqueID`s exist, then only the first row's column values will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are **case-insensitive**
@@ -542,7 +524,6 @@
     ```
 - `StatusBarItems`
   - Expanded into a single file — `StatusBarItems.yaml`
-  - Table is sorted first by `ID` ascending, then by `Name` ascending
   - `Unique`-column handling: If multiple identical `Name`s exist, then only the first row's column values will be read
     - A warning containing the values of subsequent ignored duplicate rows will be shown
     - Values are **case-insensitive**

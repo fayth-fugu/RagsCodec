@@ -36,19 +36,18 @@ function Expand-ItemLayeredZoneLevelsFromRagsFile {
     lowercase', docs/data-mapping.md, ItemLayeredZoneLevels section):
     after the null and empty checks, the value is lowercased with
     ToLowerInvariant, so the entry's ItemID key is always the lowercase
-    form of the value. The case mate whose raw casing is read first (which
-    is the case mate with the lowest row ID, since the table is sorted by
-    ItemID and then by row ID) opens the entry, and every later row whose
-    raw ItemID value differs from that first-read raw value only in
-    character case is merged into the entry with a warning describing the
-    merge; its Data value is appended to the same Data sequence. Every
-    warning and verbose message of the expansion cites the lowercased
-    ItemID value.
+    form of the value. The case mate whose raw casing is read first (the
+    first read row of the unsorted read result) opens the entry, and
+    every later row whose raw ItemID value differs from that first-read
+    raw value only in character case is merged into the entry with a
+    warning describing the merge; its Data value is appended to the same
+    Data sequence. Every warning and verbose message of the expansion
+    cites the lowercased ItemID value.
 
     The output folder is silently created when it is missing and the written
     file silently overwrites any existing one. Rows of one item appear in
-    the Data sequence in ascending row ID order. An empty table expands to
-    a top-level empty 'ItemLayeredZoneLevels' sequence.
+    the Data sequence in read order. An empty table expands to a
+    top-level empty 'ItemLayeredZoneLevels' sequence.
 
     .PARAMETER OutputPath
     Path of the folder to export the expanded ItemLayeredZoneLevels data into.
@@ -88,19 +87,17 @@ function Expand-ItemLayeredZoneLevelsFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the ItemLayeredZoneLevels data into '$OutputPath'."
 
-    # Read all rows of the table, ordered first by ItemID and then by row
-    # ID ('Table is sorted first by ItemID ascending, then by ID
-    # ascending', docs/data-mapping.md, ItemLayeredZoneLevels section). The
-    # ItemID column of the database is collated case-insensitively, so rows
-    # of items whose names differ only in character case may interleave
-    # here. Such rows are grouped by their lowercased values below ('Values
-    # are case-insensitive' and 'Always coerced to lowercase',
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort). The ItemID column
+    # of the database is collated case-insensitively, so rows of items
+    # whose names differ only in character case may return in any relative
+    # order. Such rows are grouped by their lowercased values below
+    # ('Values are case-insensitive' and 'Always coerced to lowercase',
     # docs/data-mapping.md, ItemLayeredZoneLevels section), keeping every
-    # row in ascending ID order and the first-read raw casing for the merge
-    # comparisons (the SQL sort and row IDs make the first-read raw casing
-    # the one with the lowest ID).
+    # row in read order and the first-read raw casing for the merge
+    # comparisons.
     Write-Verbose 'Reading the ItemLayeredZoneLevels rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [ItemID], [Data] FROM [ItemLayeredZoneLevels] ORDER BY [ItemID] ASC, [ID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [ItemID], [Data] FROM [ItemLayeredZoneLevels]')
     Write-Verbose "Read $($rows.Count) ItemLayeredZoneLevels row(s)."
 
     # Group the rows by their lowercased ItemID value ('Always coerced to
@@ -111,11 +108,8 @@ function Expand-ItemLayeredZoneLevelsFromRagsFile {
     # group is kept alongside, so that the merge comparison below can
     # detect the rows whose raw casing differs from the first-read one.
     # Group names, first-read raw names and Data value lists are kept as
-    # parallel lists. For a fixed lowercased name the rows arrive in
-    # ascending ID order (the SQL sort is a total order within a set of
-    # case mates, separated by row IDs), so appending each Data value to
-    # its group as the rows arrive preserves the documented row order
-    # within every group.
+    # parallel lists. Appending each Data value to its group as the rows
+    # arrive preserves the read order within every group.
     $groupNames = [System.Collections.Generic.List[string]]::new()
     $groupRawNames = [System.Collections.Generic.List[string]]::new()
     $groupDataValues = [System.Collections.Generic.List[object]]::new()
@@ -176,9 +170,8 @@ function Expand-ItemLayeredZoneLevelsFromRagsFile {
         $groupDataValues[$groupIndex].Add($stagedData)
     }
 
-    # Build the top-level entry list, one entry per item in first-row
-    # order (= ascending lowercased ItemID of the case-insensitive group
-    # names, from the SQL sort).
+    # Build the top-level entry list, one entry per item in first-read
+    # order.
     $entries = [System.Collections.Generic.List[object]]::new()
     for ($groupIndex = 0; $groupIndex -lt $groupNames.Count; $groupIndex++) {
         $entries.Add([ordered]@{

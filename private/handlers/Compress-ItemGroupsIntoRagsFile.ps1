@@ -20,9 +20,8 @@ function Compress-ItemGroupsIntoRagsFile {
     value. One table row is appended per item group entry (the ID identity
     column is excluded and auto-supplied by the database), replicating the
     row order of the original expansion: entries keep their YAML sequence
-    order, which is the ascending Name order of the original table read
-    ("Table is sorted first by Name ascending, then by ID ascending",
-    docs/data-mapping.md, ItemGroups section).
+    order, which is the order the database returns them (the SELECT
+    carries no ORDER BY; the table has no documented sort).
 
     The 'ItemGroups.yaml' file is consumed as follows:
     - A file which defines more than one YAML document is consumed from

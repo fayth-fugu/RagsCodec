@@ -23,7 +23,7 @@ function Compress-RoomExitsIntoRagsFile {
     the database), replicating the row order of the original expansion:
     the exits of every entry keep their YAML sequence order, and entries
     keep their YAML sequence order, so re-expanding the file restores
-    the entries and their exits in ascending row ID order.
+    the entries and their exits in read order.
 
     The 'RoomExits.yaml' file is consumed as follows:
     - A file which defines more than one YAML document is consumed from

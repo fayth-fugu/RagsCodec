@@ -26,10 +26,9 @@ function Expand-RoomPropertiesFromRagsFile {
     section): after the null and empty checks, the value is lowercased
     with ToLowerInvariant, so the entry's RoomID key is always the
     lowercase form of the value. The case mate whose raw casing is read
-    first (which is the case mate with the lowest property Name and then
-    the lowest row ID, since the table is sorted by RoomID, then by Name
-    and then by row ID) opens the entry, and every later row whose raw
-    RoomID value differs from that first-read raw value only in character
+    first (the first read row of the unsorted read result) opens the
+    entry, and every later row whose raw RoomID value differs from that
+    first-read raw value only in character
     case is merged into the entry with a warning describing the merge; its
     property is written into the same property sequence. Every warning and
     verbose message of the expansion cites the lowercased RoomID value.
@@ -46,11 +45,9 @@ function Expand-RoomPropertiesFromRagsFile {
     skipped with a warning, as no meaningful entry or property key can be
     derived from them. Rows within one room which repeat an exact,
     previously read property Name are also skipped with a warning (the
-    Value of the first read row wins): all rows are sorted first by
-    RoomID, then by Name and then by row ID, which both orders the
-    reported rows and makes the winning row of such a duplicate
-    deterministic. Property names which differ only in character case are
-    distinct properties and never considered duplicates.
+    Value of the first read row wins, the first read row being the first
+    row of the unsorted read result). Property names which differ only in
+    character case are distinct properties and never considered duplicates.
 
     The output folder is silently created when it is missing and the
     written file silently overwrites any existing one. An empty table
@@ -94,14 +91,13 @@ function Expand-RoomPropertiesFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the RoomProperties data into '$OutputPath'."
 
-    # Read all rows of the table, ordered first by RoomID, then by Name
-    # and then by row ID ('Table is sorted first by RoomID ascending, then
-    # by Name ascending, then by ID ascending', docs/data-mapping.md,
-    # RoomProperties section). The RoomID and Name columns of the database
-    # are collated case-insensitively, so rows whose values differ only in
-    # character case may interleave here and sort next to each other.
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort). The RoomID and Name
+    # columns of the database are collated case-insensitively, so rows
+    # whose values differ only in character case may interleave in the
+    # read result.
     Write-Verbose 'Reading the RoomProperties rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [RoomID], [Name], [Value] FROM [RoomProperties] ORDER BY [RoomID] ASC, [Name] ASC, [ID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [RoomID], [Name], [Value] FROM [RoomProperties]')
     Write-Verbose "Read $($rows.Count) RoomProperties row(s)."
 
     # Group the rows by their lowercased RoomID value ('Always coerced to
@@ -113,11 +109,8 @@ function Expand-RoomPropertiesFromRagsFile {
     # detect the rows whose raw casing differs from the first-read one.
     # Group names, first-read raw names and per-room property lists are
     # kept as parallel lists, while the duplicate check further down
-    # compares property names ordinally. For a fixed lowercased room name
-    # the rows arrive in ascending Name and row ID order (the SQL sort is
-    # a total order within a set of case mates, separated by their
-    # property names and row IDs), so processing each row as it arrives
-    # preserves the documented row order within every group.
+    # compares property names ordinally. Processing each row as it
+    # arrives preserves the read order within every group.
     $groupNames = [System.Collections.Generic.List[string]]::new()
     $groupRawNames = [System.Collections.Generic.List[string]]::new()
     $groupProperties = [System.Collections.Generic.List[object]]::new()
@@ -218,9 +211,8 @@ function Expand-RoomPropertiesFromRagsFile {
         })
     }
 
-    # Build the top-level entry list, one entry per room in first-row
-    # order (= ascending lowercased RoomID of the case-insensitive group
-    # names, from the SQL sort).
+    # Build the top-level entry list, one entry per room in first-read
+    # order.
     $entries = [System.Collections.Generic.List[object]]::new()
     for ($groupIndex = 0; $groupIndex -lt $groupNames.Count; $groupIndex++) {
         $entries.Add([ordered]@{

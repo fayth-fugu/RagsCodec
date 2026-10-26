@@ -15,8 +15,8 @@ function Expand-PlayerActionsFromRagsFile {
     The written YAML file holds a bare top-level mapping whose Data key
     wraps the sequence of the expanded payloads (the documented sample
     structure of a 'PlayerActions.yaml' file), one entry per Data row of
-    the table, in ascending row ID order — 'Table is sorted by ID
-    ascending' (docs/data-mapping.md, PlayerActions section). Each entry
+    the table, in read order (the SELECT carries no ORDER BY; the table
+    has no documented sort). Each entry
     is expanded from the encoded RAGS action of the row (Base64-decoded,
     GZip-decompressed and pretty-printed XML) through
     Expand-RagsActionIntoXml, per the documented 'All Data rows are
@@ -79,17 +79,15 @@ function Expand-PlayerActionsFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $OutputPath
     Write-Verbose "Expanding the PlayerActions data into '$OutputPath'."
 
-    # Read all rows of the table, ordered by row ID, as documented for
-    # the PlayerActions table ('Table is sorted by ID ascending', see
-    # docs/data-mapping.md, PlayerActions section).
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort).
     Write-Verbose 'Reading the PlayerActions rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Data] FROM [PlayerActions] ORDER BY [ID] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Data] FROM [PlayerActions]')
     Write-Verbose "Read $($rows.Count) PlayerActions row(s)."
 
-    # The expanded payloads accumulate into one sequence, in ascending
-    # row ID order: the SQL sort is a total order over the ID identity
-    # column, so appending each expanded payload as the rows arrive
-    # preserves the documented row order.
+    # The expanded payloads accumulate into one sequence, in read order:
+    # appending each expanded payload as the rows arrive preserves the
+    # database return order.
     $payloads = [System.Collections.Generic.List[string]]::new()
 
     foreach ($row in $rows) {

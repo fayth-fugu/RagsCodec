@@ -23,7 +23,7 @@ function Compress-ItemPropertiesIntoRagsFile {
     original expansion: the properties of every entry keep their YAML
     sequence order, and entries keep their YAML sequence order, so
     re-expanding the file restores the entries and their properties in
-    ascending row ID order.
+    read order.
 
     The 'ItemProperties.yaml' file is consumed as follows:
     - A file which defines more than one YAML document is consumed from

@@ -34,10 +34,10 @@ function Expand-MediaFromRagsFile {
     and the GUID naming the file is derived from that lowercased form as
     well.
 
-    Rows are expected to hold distinct Name values: the table is sorted by
-    Name ascending ('Table is sorted by Name ascending',
-    docs/data-mapping.md, Media section) before it is read, so for every
-    media after the first whose Name compares equal to a previously read
+    Rows are expected to hold distinct Name values: rows are read in the
+    order the database returns them (the SELECT carries no ORDER BY; the
+    table has no documented sort), so for every media after the first
+    whose Name compares equal to a previously read
     media — ignoring character case, per the Unique handling quoted above —
     the second and later rows are skipped with a warning which contains the
     column values of the ignored duplicate row, as the documentation
@@ -95,16 +95,16 @@ function Expand-MediaFromRagsFile {
     $null = New-Item -ItemType Directory -Force -Path $mediaFolder
     Write-Verbose "Expanding the Media data into '$mediaFolder'."
 
-    # Read all rows of the table, ordered by Name ascending ("Table is
-    # sorted by Name ascending", docs/data-mapping.md, Media section; the
-    # SELECT reads every column because the table has neither an
-    # Exclude-tagged nor an identity column). The Name column of the
-    # database is collated case-insensitively, so rows of media whose names
-    # differ only in character case sort next to each other here (their
-    # relative read order is the engine's tiebreak); duplicates among them
-    # are dropped case-insensitively below, in the read order of the rows.
+    # Read all rows of the table in the order the database returns them
+    # (no ORDER BY; the table has no documented sort; the SELECT reads
+    # every column because the table has neither an Exclude-tagged nor an
+    # identity column). The Name column of the database is collated
+    # case-insensitively, so rows of media whose names differ only in
+    # character case may return in any relative order; duplicates among
+    # them are dropped case-insensitively below, in the read order of the
+    # rows.
     Write-Verbose 'Reading the Media rows of the RAGS file.'
-    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [Name], [BackgroundColor], [TextColor], [TextFont], [ImageName], [UseEnhancedGraphics], [NewImage], [Data], [GroupName] FROM [Media] ORDER BY [Name] ASC')
+    $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [Name], [BackgroundColor], [TextColor], [TextFont], [ImageName], [UseEnhancedGraphics], [NewImage], [Data], [GroupName] FROM [Media]')
     Write-Verbose "Read $($rows.Count) Media row(s)."
 
     # The Media table has no identity column which could label the rows of
