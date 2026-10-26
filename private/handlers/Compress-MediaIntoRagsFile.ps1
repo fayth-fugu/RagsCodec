@@ -71,8 +71,9 @@ function Compress-MediaIntoRagsFile {
       section of docs/data-mapping.md).
     - A text column value (BackgroundColor, TextColor, TextFont,
       ImageName, NewImage, GroupName) which is missing or null is stored
-      as a database null without a warning, as the expansion emits a YAML
-      null for a missing column value. A scalar of any other type (an
+      as the empty string without a warning, mirroring the null-string
+      emission rule of the expansion (a null column value is emitted as
+      the empty string). A scalar of any other type (an
       unquoted integer or decimal, for example) is coerced to its
       invariant string form with a warning; a sequence or a mapping
       throws. A value longer than the maximum length of the table column
@@ -402,13 +403,16 @@ function Compress-MediaIntoRagsFile {
 
         # Validate the six text column values (BackgroundColor, TextColor,
         # TextFont, ImageName, NewImage, GroupName) with the shared scalar
-        # ladder: missing or null is stored as a database null; a string is
-        # stored as read (verbatim: no line-ending normalization, mirroring
-        # the expansion's verbatim emission); a scalar of any other type is
-        # coerced to its invariant string form with a warning; a sequence
-        # or a mapping throws. Each value is truncated to the maximum
-        # length of its table column with a warning.
-        $backgroundColor = $null
+        # ladder: missing or null is stored as the empty string without a
+        # warning, mirroring the null-string emission rule of the
+        # expansion (a null column value is emitted as the empty string);
+        # a string is stored as read (verbatim: no line-ending
+        # normalization, mirroring the expansion's verbatim emission); a
+        # scalar of any other type is coerced to its invariant string form
+        # with a warning; a sequence or a mapping throws. Each value is
+        # truncated to the maximum length of its table column with a
+        # warning.
+        $backgroundColor = ''
         if ($null -ne $backgroundColorValue) {
             if ($backgroundColorValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Media data of the RAGS file: the BackgroundColor of the file '$($file.Name)' of media '$name' carries a sequence where a scalar value is expected."
@@ -434,7 +438,7 @@ function Compress-MediaIntoRagsFile {
             }
         }
 
-        $textColor = $null
+        $textColor = ''
         if ($null -ne $textColorValue) {
             if ($textColorValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Media data of the RAGS file: the TextColor of the file '$($file.Name)' of media '$name' carries a sequence where a scalar value is expected."
@@ -460,7 +464,7 @@ function Compress-MediaIntoRagsFile {
             }
         }
 
-        $textFont = $null
+        $textFont = ''
         if ($null -ne $textFontValue) {
             if ($textFontValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Media data of the RAGS file: the TextFont of the file '$($file.Name)' of media '$name' carries a sequence where a scalar value is expected."
@@ -486,7 +490,7 @@ function Compress-MediaIntoRagsFile {
             }
         }
 
-        $imageName = $null
+        $imageName = ''
         if ($null -ne $imageNameValue) {
             if ($imageNameValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Media data of the RAGS file: the ImageName of the file '$($file.Name)' of media '$name' carries a sequence where a scalar value is expected."
@@ -512,7 +516,7 @@ function Compress-MediaIntoRagsFile {
             }
         }
 
-        $newImage = $null
+        $newImage = ''
         if ($null -ne $newImageValue) {
             if ($newImageValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Media data of the RAGS file: the NewImage of the file '$($file.Name)' of media '$name' carries a sequence where a scalar value is expected."
@@ -538,7 +542,7 @@ function Compress-MediaIntoRagsFile {
             }
         }
 
-        $groupName = $null
+        $groupName = ''
         if ($null -ne $groupNameValue) {
             if ($groupNameValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Media data of the RAGS file: the GroupName of the file '$($file.Name)' of media '$name' carries a sequence where a scalar value is expected."
@@ -664,12 +668,14 @@ function Compress-MediaIntoRagsFile {
         # appended data behind. The values are bound through provider
         # parameters throughout, as the RAGS media byte streams are far
         # beyond any quoting limit (and the text values are not SQL
-        # literals either). A database null is expressed with
-        # [System.DBNull]::Value, as a raw $null means 'not supplied' to
-        # the SQL Server Compact parameter binding; the byte-array Data
-        # value is assigned through the branch structure directly, as the
-        # if-statement pipeline form would enumerate the array into an
-        # object array which the Image parameter refuses.
+        # literals either). The staged text values are always strings (a
+        # null source value stages the empty string), while the missing
+        # Data value is expressed with [System.DBNull]::Value, as a raw
+        # $null means 'not supplied' to the SQL Server Compact parameter
+        # binding; the byte-array Data value is assigned through the
+        # branch structure directly, as the if-statement pipeline form
+        # would enumerate the array into an object array which the Image
+        # parameter refuses.
         $transaction = $null
         try {
             $transaction = $RagsConnection.BeginTransaction()
@@ -687,19 +693,23 @@ function Compress-MediaIntoRagsFile {
                     $null = $command.Parameters.Add($nameParameter)
 
                     $bgParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@bgcolor', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.BackgroundColor) { $bgParameter.Value = [System.DBNull]::Value } else { $bgParameter.Value = $stagedRow.BackgroundColor }
+                    # The staged text values are always strings (a null
+                    # source value stages the empty string), so the text
+                    # parameters bind their staged values directly; the
+                    # Data parameter keeps its database-null branch.
+                    $bgParameter.Value = $stagedRow.BackgroundColor
                     $null = $command.Parameters.Add($bgParameter)
 
                     $fgParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@textcolor', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.TextColor) { $fgParameter.Value = [System.DBNull]::Value } else { $fgParameter.Value = $stagedRow.TextColor }
+                    $fgParameter.Value = $stagedRow.TextColor
                     $null = $command.Parameters.Add($fgParameter)
 
                     $fontParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@textfont', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.TextFont) { $fontParameter.Value = [System.DBNull]::Value } else { $fontParameter.Value = $stagedRow.TextFont }
+                    $fontParameter.Value = $stagedRow.TextFont
                     $null = $command.Parameters.Add($fontParameter)
 
                     $imgParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@imagename', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.ImageName) { $imgParameter.Value = [System.DBNull]::Value } else { $imgParameter.Value = $stagedRow.ImageName }
+                    $imgParameter.Value = $stagedRow.ImageName
                     $null = $command.Parameters.Add($imgParameter)
 
                     $enhancedParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@enhanced', [System.Data.SqlDbType]::Bit)
@@ -707,7 +717,7 @@ function Compress-MediaIntoRagsFile {
                     $null = $command.Parameters.Add($enhancedParameter)
 
                     $newImgParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@newimage', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.NewImage) { $newImgParameter.Value = [System.DBNull]::Value } else { $newImgParameter.Value = $stagedRow.NewImage }
+                    $newImgParameter.Value = $stagedRow.NewImage
                     $null = $command.Parameters.Add($newImgParameter)
 
                     $dataParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@data', [System.Data.SqlDbType]::Image)
@@ -715,7 +725,7 @@ function Compress-MediaIntoRagsFile {
                     $null = $command.Parameters.Add($dataParameter)
 
                     $groupParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@groupname', [System.Data.SqlDbType]::NVarChar, 255)
-                    if ($null -eq $stagedRow.GroupName) { $groupParameter.Value = [System.DBNull]::Value } else { $groupParameter.Value = $stagedRow.GroupName }
+                    $groupParameter.Value = $stagedRow.GroupName
                     $null = $command.Parameters.Add($groupParameter)
 
                     $null = $command.ExecuteNonQuery()

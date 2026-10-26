@@ -18,10 +18,12 @@ function Expand-StatusBarItemsFromRagsFile {
     Text value, the Width value and the Visible value. Rows are sorted by
     row ID and then by Name before they are read, as documented ("Table is
     sorted first by ID ascending, then by Name ascending",
-    docs/data-mapping.md, StatusBarItems section). Every null column value
-    is emitted as a YAML null, except for the Visible bit column whose null
-    value is emitted as $false (though the column is NOT NULL in the
-    schema, so a null never occurs through the documented data path).
+    docs/data-mapping.md, StatusBarItems section). A null string column
+    value (the Name key and the Text value) is emitted as the empty
+    string; a null Width value is emitted as a YAML null; and the Visible
+    bit column would emit $false for a null value (though the column is
+    NOT NULL in the schema, so a null never occurs through the documented
+    data path).
 
     Rows are expected to hold distinct Name values: the table is sorted by
     row ID before it is read, so for every row after the first whose Name
@@ -40,16 +42,17 @@ function Expand-StatusBarItemsFromRagsFile {
     Rows with a null, empty or whitespace-only Name value are NOT skipped:
     unlike the entry-keyed tables whose null keys cannot name an entry,
     the status bar item entries are emitted in read order regardless of
-    their Name value, so such a row emits an entry whose Name key is a
-    YAML null (a null value), the empty string or the verbatim whitespace
-    string. The case-insensitive duplicate handling applies to those
-    values as well: after the first read row with a null (or empty or
-    whitespace, or any other equal-ignoring-character-case) Name value,
-    every further row whose Name compares equal to it is skipped with the
-    duplicate warning described above. Two distinct Name values that
+    their Name value, so such a row emits an entry whose Name key is the
+    empty string (a null Name value reads back as "") or the verbatim
+    whitespace string. The case-insensitive duplicate handling applies to
+    those values as well: after the first read row with a null (or empty,
+    or any other equal-ignoring-character-case) Name value, every further
+    row whose Name duplicates it is skipped with the duplicate warning
+    described above (a null and the empty Name string duplicate each
+    other, both are read back as ""). Two distinct Name values that
     differ only in leading/trailing whitespace (for example the empty
-    string and a whitespace-only string) are NOT duplicates of each other;
-    no value is trimmed or otherwise normalized.
+    string and a whitespace-only string) are NOT duplicates of each
+    other; no value is trimmed or otherwise normalized.
 
     The output folder is silently created when it is missing and the written
     file silently overwrites any existing one. An empty table expands to a
@@ -105,27 +108,28 @@ function Expand-StatusBarItemsFromRagsFile {
     $rows = @(Get-RagsSchemaRowSet -RagsConnection $RagsConnection -Sql 'SELECT [ID], [Name], [Text], [Width], [Visible] FROM [StatusBarItems] ORDER BY [ID] ASC, [Name] ASC')
     Write-Verbose "Read $($rows.Count) StatusBarItems row(s)."
 
-    # The Name values of the status bar items whose entries were built,
-    # kept in a separate list so that the duplicate check below can compare
-    # case-insensitively (the documented Unique handling of the table —
-    # "If multiple identical Names exist, then only the first row's column
-    # values will be read" with "Values are case-insensitive", see the
-    # StatusBarItems section of docs/data-mapping.md). The list is typed
-    # for objects because the elected contract of this table also admits
-    # rows with a null Name value, which participate in the duplicate
-    # check as their own value: after the first read null Name, every
-    # further null Name row is a duplicate of it.
-    $admittedValues = [System.Collections.Generic.List[object]]::new()
+    # The staged Name values of the status bar items whose entries were
+    # built, kept in a separate list so that the duplicate check below can
+    # compare case-insensitively (the documented Unique handling of the
+    # table — "If multiple identical Names exist, then only the first
+    # row's column values will be read" with "Values are case-insensitive",
+    # see the StatusBarItems section of docs/data-mapping.md). A null Name
+    # stages the empty string, so a null and an empty Name duplicate each
+    # other while whitespace-only values stay distinct.
+    $admittedValues = [System.Collections.Generic.List[string]]::new()
     $entries = [System.Collections.Generic.List[object]]::new()
 
     foreach ($row in $rows) {
         $rowId = $row['ID']
 
-        # A null column value is written as a YAML null (and never skipped:
-        # rows with a null, empty or whitespace-only Name value still emit
-        # their entry, per the elected contract of this table). Every value
-        # is staged before the duplicate check so that the warning below
-        # never reads a value of a previous iteration.
+        # A null Name value is written as the empty string (and never
+        # skipped: rows with a null, empty or whitespace-only Name value
+        # still emit their entry, per the elected contract of this table;
+        # the raw value is kept because the duplicate warning below cites
+        # it, so a null keeps its '<null>' citation even though its
+        # emitted value is the empty string). Every value is staged before
+        # the duplicate check so that the warning below never reads a
+        # value of a previous iteration.
         $name = $row['Name']
         if (($null -eq $name) -or ($name -is [System.DBNull])) {
             $name = $null
@@ -133,16 +137,26 @@ function Expand-StatusBarItemsFromRagsFile {
         else {
             $name = [string]$name
         }
+        $nameRaw = $name
+        if ($null -eq $name) {
+            $name = ''
+        }
 
         # The multi-line Text value is staged verbatim (its line breaks are
         # kept; the literal block's reading rule drifts them to line feeds
-        # only when the written file is parsed again).
+        # only when the written file is parsed again); a null Text value is
+        # written as the empty string, and the raw value is kept because
+        # the duplicate warning below cites it ('<null>' citation kept).
         $text = $row['Text']
         if (($null -eq $text) -or ($text -is [System.DBNull])) {
             $text = $null
         }
         else {
             $text = [string]$text
+        }
+        $textRaw = $text
+        if ($null -eq $text) {
+            $text = ''
         }
 
         # The Width value is staged as an integer as read from the
@@ -167,31 +181,25 @@ function Expand-StatusBarItemsFromRagsFile {
             $visible = [bool]$visible
         }
 
-        # Soft-validate the Unique Name column: a row whose value compares
-        # equal to a previously read row's value — ignoring character case,
-        # and treating two null values as equal — is skipped with a warning
-        # containing the column values of the ignored duplicate row ("A
-        # warning containing the values of subsequent ignored duplicate
-        # rows will be shown", docs/data-mapping.md, StatusBarItems
-        # section; the column values of the first read row win).
+        # Soft-validate the Unique Name column: a row whose staged value
+        # compares equal to a previously staged row's value — ignoring
+        # character case, so a null and the empty Name string duplicate
+        # each other while whitespace-only values stay distinct — is
+        # skipped with a warning containing the column values of the
+        # ignored duplicate row ("A warning containing the values of
+        # subsequent ignored duplicate rows will be shown",
+        # docs/data-mapping.md, StatusBarItems section; the column values
+        # of the first read row win).
         $isDuplicate = $false
         foreach ($existingValue in $admittedValues) {
-            if ($null -eq $existingValue) {
-                if ($null -eq $name) {
-                    $isDuplicate = $true
-                    break
-                }
-            }
-            elseif ($null -ne $name) {
-                if ([string]::Equals([string]$existingValue, [string]$name, [System.StringComparison]::OrdinalIgnoreCase)) {
-                    $isDuplicate = $true
-                    break
-                }
+            if ([string]::Equals($existingValue, $name, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $isDuplicate = $true
+                break
             }
         }
         if ($isDuplicate) {
-            if ($null -eq $name) { $nameClause = '<null>' } else { $nameClause = "'" + $name + "'" }
-            if ($null -eq $text) { $textEvidence = 'Text <null>' } else { $textEvidence = 'Text ' + $text }
+            if ($null -eq $nameRaw) { $nameClause = '<null>' } else { $nameClause = "'" + $nameRaw + "'" }
+            if ($null -eq $textRaw) { $textEvidence = 'Text <null>' } else { $textEvidence = 'Text ' + $textRaw }
             if ($null -eq $width) { $widthEvidence = 'Width <null>' } else { $widthEvidence = 'Width ' + [string]$width }
             if ($visible) { $visibleEvidence = 'Visible True' } else { $visibleEvidence = 'Visible False' }
             $evidenceText = 'Name ' + $nameClause + ', ' + $textEvidence + ', ' + $widthEvidence + ', ' + $visibleEvidence

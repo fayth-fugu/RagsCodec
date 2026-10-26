@@ -22,7 +22,9 @@ function Expand-PlayerFromRagsFile {
     written YAML is read back, so a read-back value carries the
     line-feed form of whatever line breaks the table stores; the values
     themselves are emitted verbatim. Every null column value is emitted
-    as a YAML null.
+    as a YAML null, except the null values of the string columns (Name,
+    Description, StartingRoom, CurrentRoom, PlayerLayeredImage and
+    PlayerPortrait), which are emitted as the empty string.
 
     The Player table is documented to hold a single row; 'if multiple
     rows exist, only the first row's column values will be read' and
@@ -30,27 +32,30 @@ function Expand-PlayerFromRagsFile {
     rows will be shown' (docs/data-mapping.md, Player section). Every
     row after the first is therefore ignored with one warning each,
     which names the row's position in the read result ('the Player row
-    N of the read result') and its column values as they would have
-    been written — a bit column storing a null is reported with the
-    false it was read as, a null ntext value with '<null>' and the
-    WeightLimit value with its invariant numeric form. The table has no
-    identity column and no documented sort, so the expanded row is
-    always the first row of the unsorted read result.
+    N of the read result') and its column values as stored — a bit
+    column storing a null is reported with the false it was read as, a
+    null string column value with '<null>' and the WeightLimit value
+    with its invariant numeric form. The table has no identity column
+    and no documented sort, so the expanded row is always the first row
+    of the unsorted read result.
 
     As documented for the 'Player' table in docs/data-mapping.md, the
     values of the StartingRoom and PlayerPortrait columns 'will always
     be coerced to lowercase during expansion and compression'. The
     expanded row's two values are therefore read as lowercase, and a
     value whose stored casing differs warns once, naming the stored
-    value and the lowercased form it is written to the file with. The
-    ignored rows are never lowercased — a casing warning about values
-    that are never written would be misleading — so their column values
-    are cited with the raw casing the table stores.
+    value and the lowercased form it is written to the file with. A
+    null value of either column is emitted as the empty string and
+    never triggers the casing warning. The ignored rows are never
+    lowercased — a casing warning about values that are never written
+    would be misleading — so their column values are cited with the raw
+    casing the table stores.
 
     When the table is empty altogether (e.g. in a formatted RAGS file),
-    the file is still written, with every column key holding a YAML null
-    (the bit columns are then not mapped to booleans, since there is no
-    row whose values could be read).
+    the file is still written, with every string column key holding the
+    empty string and every integer, number and bit column key holding a
+    YAML null (the bit columns are then not mapped to booleans, since
+    there is no row whose values could be read).
 
     The output folder is silently created when it is missing and the
     written file silently overwrites any existing one.
@@ -109,19 +114,21 @@ function Expand-PlayerFromRagsFile {
     # Column values, computed in the schema column order and before the
     # ignored-row warnings below, so those warnings follow the casing
     # warnings of the expanded row (whose values are written to the file)
-    # in the same warning stream. When no row was read every value stays
-    # null: an empty Player table is expanded into an all-null mapping
-    # (whereas a read row maps its null bit columns to false, per the
-    # documented reading of missing bit values).
-    $name = $null
-    $description = $null
-    $startingRoom = $null
-    $currentRoom = $null
-    $playerLayeredImage = $null
+    # in the same warning stream. When no row was read, the string
+    # column values stage the empty string while the integer, number and
+    # Boolean column values stay null: an empty Player table is expanded
+    # into a mapping whose string column keys hold '' (whereas a read
+    # row maps its null bit columns to false, per the documented reading
+    # of missing bit values).
+    $name = ''
+    $description = ''
+    $startingRoom = ''
+    $currentRoom = ''
+    $playerLayeredImage = ''
     $playerGender = $null
     $promptForName = $null
     $promptForGender = $null
-    $playerPortrait = $null
+    $playerPortrait = ''
     $enforceWeight = $null
     $weightLimit = $null
 
@@ -129,7 +136,7 @@ function Expand-PlayerFromRagsFile {
         # The nvarchar columns are emitted as YAML strings.
         $name = $row['Name']
         if (($null -eq $name) -or ($name -is [System.DBNull])) {
-            $name = $null
+            $name = ''
         }
         else {
             $name = [string]$name
@@ -141,7 +148,7 @@ function Expand-PlayerFromRagsFile {
         # is read back.
         $description = $row['Description']
         if (($null -eq $description) -or ($description -is [System.DBNull])) {
-            $description = $null
+            $description = ''
         }
         else {
             $description = [string]$description
@@ -152,10 +159,12 @@ function Expand-PlayerFromRagsFile {
         # docs/data-mapping.md ('values of these columns will always be
         # coerced to lowercase during expansion and compression'). A
         # stored value whose casing differs warns once; the warning
-        # cites the raw stored value and the lowercased form.
+        # cites the raw stored value and the lowercased form. A null
+        # value is emitted as the empty string and never triggers the
+        # casing warning.
         $startingRoom = $row['StartingRoom']
         if (($null -eq $startingRoom) -or ($startingRoom -is [System.DBNull])) {
-            $startingRoom = $null
+            $startingRoom = ''
         }
         else {
             $startingRoomRaw = [string]$startingRoom
@@ -167,7 +176,7 @@ function Expand-PlayerFromRagsFile {
 
         $currentRoom = $row['CurrentRoom']
         if (($null -eq $currentRoom) -or ($currentRoom -is [System.DBNull])) {
-            $currentRoom = $null
+            $currentRoom = ''
         }
         else {
             $currentRoom = [string]$currentRoom
@@ -175,7 +184,7 @@ function Expand-PlayerFromRagsFile {
 
         $playerLayeredImage = $row['PlayerLayeredImage']
         if (($null -eq $playerLayeredImage) -or ($playerLayeredImage -is [System.DBNull])) {
-            $playerLayeredImage = $null
+            $playerLayeredImage = ''
         }
         else {
             $playerLayeredImage = [string]$playerLayeredImage
@@ -205,10 +214,12 @@ function Expand-PlayerFromRagsFile {
         # docs/data-mapping.md ('values of these columns will always be
         # coerced to lowercase during expansion and compression'). A
         # stored value whose casing differs warns once; the warning
-        # cites the raw stored value and the lowercased form.
+        # cites the raw stored value and the lowercased form. A null
+        # value is emitted as the empty string and never triggers the
+        # casing warning.
         $playerPortrait = $row['PlayerPortrait']
         if (($null -eq $playerPortrait) -or ($playerPortrait -is [System.DBNull])) {
-            $playerPortrait = $null
+            $playerPortrait = ''
         }
         else {
             $playerPortraitRaw = [string]$playerPortrait
@@ -381,7 +392,7 @@ function Expand-PlayerFromRagsFile {
     $filePath = Join-Path $OutputPath 'Player.yaml'
     $ignoredRowCount = $rows.Count - 1
     if ($null -eq $row) {
-        Write-Verbose "Writing '$filePath' from an empty Player table (an all-null mapping)."
+        Write-Verbose "Writing '$filePath' from an empty Player table (empty-string string keys; null integer, number and bit keys)."
     }
     else {
         Write-Verbose "Writing '$filePath' from the first read row ($($ignoredRowCount) further row(s) ignored)."

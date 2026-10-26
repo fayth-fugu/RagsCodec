@@ -65,9 +65,10 @@ function Compress-PlayerPropertiesIntoRagsFile {
     - A Name value longer than the 250 characters of its table column is
       truncated with a warning; note that re-expanding the appended data
       then derives a different entry from the truncated value.
-    - A Value value which is missing or null is stored as a database null
-      without a warning, as the expansion emits a YAML null for a null
-      Value column; empty and whitespace-only values are stored as read.
+    - A Value value which is missing or null is stored as the empty
+      string without a warning, mirroring the null-string emission rule
+      of the expansion (a null Value value is emitted as the empty
+      string); empty and whitespace-only values are stored as read.
       Because the column of a PlayerProperties row is an ntext, the non-
       null Value value is never truncated. A scalar Value value which is
       not a string is coerced to its string form with a warning; the
@@ -354,16 +355,21 @@ function Compress-PlayerPropertiesIntoRagsFile {
         }
 
         # Normalize the Value value to its storable row value. A null
-        # value is stored as a database null without a warning, as the
-        # expansion emits a YAML null for a null Value column; empty and
+        # value is stored as the empty string without a warning,
+        # mirroring the null-string emission rule of the expansion (a
+        # null Value value is emitted as the empty string); empty and
         # whitespace-only values are stored as read. The value is never
         # truncated, as the table column is an ntext. A scalar of any
         # other type than a string is coerced to its invariant string
         # form with a warning. Like every normalization this is performed
         # BEFORE the duplicate check below, so that the warning of the
-        # check reports the values of the ignored duplicate entry.
+        # check reports the values of the ignored duplicate entry — the
+        # duplicate evidence therefore tests the raw parsed value
+        # ($entryValueValue), not the staged one, so a null keeps its
+        # '<null>' citation even though its staged value is the empty
+        # string.
         $entryValueValue = $entryValue['Value']
-        $storableValue = $null
+        $storableValue = ''
         if ($null -ne $entryValueValue) {
             if ($entryValueValue -is [System.Collections.IList]) {
                 throw "Cannot compress the PlayerProperties data of the RAGS file: the Value of the entry $($entryIndex + 1) of the file 'PlayerProperties.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -413,7 +419,7 @@ function Compress-PlayerPropertiesIntoRagsFile {
             }
         }
         if ($duplicate) {
-            if ($null -eq $storableValue) { $valueEvidence = 'Value <null>' } else { $valueEvidence = 'Value ' + $storableValue }
+            if ($null -eq $entryValueValue) { $valueEvidence = 'Value <null>' } else { $valueEvidence = 'Value ' + $storableValue }
 
             Write-Warning "Skipping the entry $($entryIndex + 1) of the file 'PlayerProperties.yaml' of the source folder: the Name value '$name' duplicates the Name value of a previously read entry (whose column values win). The ignored duplicate entry has the column values Name '$name', $valueEvidence."
             continue
@@ -452,15 +458,10 @@ function Compress-PlayerPropertiesIntoRagsFile {
                     $null = $command.Parameters.Add($nameParameter)
 
                     $valueParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@value', [System.Data.SqlDbType]::NText)
-                    if ($null -eq $stagedRow.Value) {
-                        # A parameter value of $null means 'not supplied',
-                        # so a null column value is bound as a database
-                        # null.
-                        $valueParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $valueParameter.Value = $stagedRow.Value
-                    }
+                    # The staged Value value is always a string (a null
+                    # source value stages the empty string), so the
+                    # parameter binds the staged value directly.
+                    $valueParameter.Value = $stagedRow.Value
                     $null = $command.Parameters.Add($valueParameter)
 
                     $null = $command.ExecuteNonQuery()

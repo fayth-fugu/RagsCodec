@@ -46,8 +46,10 @@
   - `int` => `!!int`
   - `nvarchar` => `!!str`
     - During compression, input strings which *exceed the defined max length* indicated in the RAGS schema are *truncated with a warning*
+    - `null` values are treated as empty strings `""`
   - `ntext` => `!!str`
     - `ntext` fields contain *multi-line free text or XML*
+    - `null` values are treated as empty strings `""`
   - `bit` => `!!bool`
     - `0` and `null` values are mapped to `false`, while `1` is mapped to `true`
   - `float` => `!!float`
@@ -55,7 +57,7 @@
     - The binary stream is *Base64-encoded* during expansion
   - `datetime` => `!!timestamp`
     - `datetime` values are extracted as *ISO 8601 strings*
-  - `null` values for any data type (except `bit`) => `!!null`
+  - `null` values for any data type (except `bit`,`nvarchar`,`ntext`) => `!!null`
 
 ## Table compression/expansion conventions
 

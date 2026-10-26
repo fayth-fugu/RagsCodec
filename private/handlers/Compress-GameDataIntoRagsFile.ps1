@@ -31,8 +31,9 @@ function Compress-GameDataIntoRagsFile {
       ignored with a warning.
     - A text column value (Title, AuthorName, GameVersion, bgMusic,
       GamePassword, ObjectVersionNumber, GameFont) which is missing or
-      null is stored as a database null without a warning, as the
-      expansion emits a YAML null for a null column. A value which is a
+      null is stored as the empty string without a warning, mirroring
+      the null-string emission rule of the expansion (a null column
+      value is emitted as the empty string). A value which is a
       scalar but not a string (a hand-edited unquoted number, for
       example) is coerced to its string form with a warning; the string
       form of format-sensitive values is derived with the invariant
@@ -73,7 +74,7 @@ function Compress-GameDataIntoRagsFile {
       which cannot be parsed aborts the whole operation with an exception.
     - A mapping which defines none of the column keys (an empty mapping,
       such as the one the expansion writes for an empty GameData table)
-      still contributes one row of database-null text values, false bit
+      still contributes one row of empty-string text values, false bit
       values and the documented 0 sort orders. Note that re-expanding
       such a row then yields the defaults the row was stored with (the
       false bit values, the 0 sort orders), never the all-null mapping
@@ -240,13 +241,17 @@ function Compress-GameDataIntoRagsFile {
 
     # Normalize the twenty column values of the document to their storable
     # row values before anything is appended, so that the file is fully
-    # validated before any SQL runs. A missing value reads as null.
+    # validated before any SQL runs. A missing text value stages the
+    # empty string; a missing value of the other column types reads as
+    # null.
 
     # The nvarchar columns are stored as their YAML strings, with
-    # format-sensitive scalars coerced through their invariant string form.
+    # format-sensitive scalars coerced through their invariant string
+    # form; a missing or null value stages the empty string, mirroring
+    # the null-string emission rule of the expansion.
 
     $titleValue = $rootDocument['Title']
-    $title = $null
+    $title = ''
     if ($null -ne $titleValue) {
         if ($titleValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the Title of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -274,7 +279,7 @@ function Compress-GameDataIntoRagsFile {
     }
 
     $authorNameValue = $rootDocument['AuthorName']
-    $authorName = $null
+    $authorName = ''
     if ($null -ne $authorNameValue) {
         if ($authorNameValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the AuthorName of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -302,7 +307,7 @@ function Compress-GameDataIntoRagsFile {
     }
 
     $gameVersionValue = $rootDocument['GameVersion']
-    $gameVersion = $null
+    $gameVersion = ''
     if ($null -ne $gameVersionValue) {
         if ($gameVersionValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the GameVersion of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -330,7 +335,7 @@ function Compress-GameDataIntoRagsFile {
     }
 
     $bgMusicValue = $rootDocument['bgMusic']
-    $bgMusic = $null
+    $bgMusic = ''
     if ($null -ne $bgMusicValue) {
         if ($bgMusicValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the bgMusic of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -358,7 +363,7 @@ function Compress-GameDataIntoRagsFile {
     }
 
     $gamePasswordValue = $rootDocument['GamePassword']
-    $gamePassword = $null
+    $gamePassword = ''
     if ($null -ne $gamePasswordValue) {
         if ($gamePasswordValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the GamePassword of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -386,7 +391,7 @@ function Compress-GameDataIntoRagsFile {
     }
 
     $objectVersionNumberValue = $rootDocument['ObjectVersionNumber']
-    $objectVersionNumber = $null
+    $objectVersionNumber = ''
     if ($null -ne $objectVersionNumberValue) {
         if ($objectVersionNumberValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the ObjectVersionNumber of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -414,7 +419,7 @@ function Compress-GameDataIntoRagsFile {
     }
 
     $gameFontValue = $rootDocument['GameFont']
-    $gameFont = $null
+    $gameFont = ''
     if ($null -ne $gameFontValue) {
         if ($gameFontValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the GameFont of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -442,9 +447,10 @@ function Compress-GameDataIntoRagsFile {
     }
 
     # The ntext columns are stored as read, with the same scalar coercion
-    # as the text columns but no length limit to truncate to.
+    # as the text columns but no length limit to truncate to (a missing
+    # or null value stages the empty string, like the nvarchar columns).
     $openingMessageValue = $rootDocument['OpeningMessage']
-    $openingMessage = $null
+    $openingMessage = ''
     if ($null -ne $openingMessageValue) {
         if ($openingMessageValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the OpeningMessage of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -467,7 +473,7 @@ function Compress-GameDataIntoRagsFile {
     }
 
     $gameInformationValue = $rootDocument['GameInformation']
-    $gameInformation = $null
+    $gameInformation = ''
     if ($null -ne $gameInformationValue) {
         if ($gameInformationValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the GameInformation of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -490,7 +496,7 @@ function Compress-GameDataIntoRagsFile {
     }
 
     $roomGroupsValue = $rootDocument['RoomGroups']
-    $roomGroups = $null
+    $roomGroups = ''
     if ($null -ne $roomGroupsValue) {
         if ($roomGroupsValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the RoomGroups of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -513,7 +519,7 @@ function Compress-GameDataIntoRagsFile {
     }
 
     $clothingZoneLevelsValue = $rootDocument['ClothingZoneLevels']
-    $clothingZoneLevels = $null
+    $clothingZoneLevels = ''
     if ($null -ne $clothingZoneLevelsValue) {
         if ($clothingZoneLevelsValue -is [System.Collections.IList]) {
             throw "Cannot compress the GameData data of the RAGS file: the ClothingZoneLevels of the file 'GameData.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -840,23 +846,14 @@ function Compress-GameDataIntoRagsFile {
             $command.CommandText = 'INSERT INTO [GameData] ([Title], [OpeningMessage], [HideMainPicDisplay], [UseInlineImages], [HidePortrait], [AuthorName], [GameVersion], [GameInformation], [bgMusic], [RepeatbgMusic], [PasswordProtected], [GamePassword], [ObjectVersionNumber], [GameFont], [RoomGroups], [ClothingZoneLevels], [NotificationsOff], [SortOrderRoom], [SortOrderCharacters], [SortOrderInventory]) VALUES (@title, @openingmessage, @hidemainpicdisplay, @useinlineimages, @hideportrait, @authorname, @gameversion, @gameinformation, @bgmusic, @repeatbgmusic, @passwordprotected, @gamepassword, @objectversionnumber, @gamefont, @roomgroups, @clothingzonelevels, @notificationsoff, @sortorderroom, @sortordercharacters, @sortorderinventory)'
 
             $titleParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@title', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $title) {
-                # A parameter value of $null means 'not supplied', so a
-                # null column value is bound as a database null.
-                $titleParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $titleParameter.Value = $title
-            }
+            # The staged text values are always strings, so the text
+            # parameters bind their staged values directly (a null
+            # source value stages the empty string).
+            $titleParameter.Value = $title
             $null = $command.Parameters.Add($titleParameter)
 
             $openingMessageParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@openingmessage', [System.Data.SqlDbType]::NText)
-            if ($null -eq $openingMessage) {
-                $openingMessageParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $openingMessageParameter.Value = $openingMessage
-            }
+            $openingMessageParameter.Value = $openingMessage
             $null = $command.Parameters.Add($openingMessageParameter)
 
             # A bit parameter requires a boolean value no matter what the
@@ -875,39 +872,19 @@ function Compress-GameDataIntoRagsFile {
             $null = $command.Parameters.Add($hidePortraitParameter)
 
             $authorNameParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@authorname', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $authorName) {
-                $authorNameParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $authorNameParameter.Value = $authorName
-            }
+            $authorNameParameter.Value = $authorName
             $null = $command.Parameters.Add($authorNameParameter)
 
             $gameVersionParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@gameversion', [System.Data.SqlDbType]::NVarChar, 50)
-            if ($null -eq $gameVersion) {
-                $gameVersionParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $gameVersionParameter.Value = $gameVersion
-            }
+            $gameVersionParameter.Value = $gameVersion
             $null = $command.Parameters.Add($gameVersionParameter)
 
             $gameInformationParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@gameinformation', [System.Data.SqlDbType]::NText)
-            if ($null -eq $gameInformation) {
-                $gameInformationParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $gameInformationParameter.Value = $gameInformation
-            }
+            $gameInformationParameter.Value = $gameInformation
             $null = $command.Parameters.Add($gameInformationParameter)
 
             $bgMusicParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@bgmusic', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $bgMusic) {
-                $bgMusicParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $bgMusicParameter.Value = $bgMusic
-            }
+            $bgMusicParameter.Value = $bgMusic
             $null = $command.Parameters.Add($bgMusicParameter)
 
             $repeatbgMusicParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@repeatbgmusic', [System.Data.SqlDbType]::Bit)
@@ -919,48 +896,23 @@ function Compress-GameDataIntoRagsFile {
             $null = $command.Parameters.Add($passwordProtectedParameter)
 
             $gamePasswordParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@gamepassword', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $gamePassword) {
-                $gamePasswordParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $gamePasswordParameter.Value = $gamePassword
-            }
+            $gamePasswordParameter.Value = $gamePassword
             $null = $command.Parameters.Add($gamePasswordParameter)
 
             $objectVersionNumberParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@objectversionnumber', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $objectVersionNumber) {
-                $objectVersionNumberParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $objectVersionNumberParameter.Value = $objectVersionNumber
-            }
+            $objectVersionNumberParameter.Value = $objectVersionNumber
             $null = $command.Parameters.Add($objectVersionNumberParameter)
 
             $gameFontParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@gamefont', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $gameFont) {
-                $gameFontParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $gameFontParameter.Value = $gameFont
-            }
+            $gameFontParameter.Value = $gameFont
             $null = $command.Parameters.Add($gameFontParameter)
 
             $roomGroupsParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@roomgroups', [System.Data.SqlDbType]::NText)
-            if ($null -eq $roomGroups) {
-                $roomGroupsParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $roomGroupsParameter.Value = $roomGroups
-            }
+            $roomGroupsParameter.Value = $roomGroups
             $null = $command.Parameters.Add($roomGroupsParameter)
 
             $clothingZoneLevelsParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@clothingzonelevels', [System.Data.SqlDbType]::NText)
-            if ($null -eq $clothingZoneLevels) {
-                $clothingZoneLevelsParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $clothingZoneLevelsParameter.Value = $clothingZoneLevels
-            }
+            $clothingZoneLevelsParameter.Value = $clothingZoneLevels
             $null = $command.Parameters.Add($clothingZoneLevelsParameter)
 
             # NotificationsOff and the three sort-order columns are not

@@ -20,26 +20,31 @@ function Expand-GameDataFromRagsFile {
     normalizes a literal block's line breaks to line feeds when the
     written YAML is read back, so a read-back value carries the line-feed
     form of whatever line breaks the table stores; the values themselves
-    are emitted verbatim. Every null column value is emitted as a YAML null.
+    are emitted verbatim. Every null column value is emitted as a YAML
+    null, except the null values of the string columns (Title,
+    OpeningMessage, AuthorName, GameVersion, GameInformation, bgMusic,
+    GamePassword, ObjectVersionNumber, GameFont, RoomGroups and
+    ClothingZoneLevels), which are emitted as the empty string.
 
     The GameData table is documented to hold a single row; rows after
     the first are ignored, one warning each, which names the row's
     position in the read result ('the GameData row N of the read
-    result') and its column values as they would have been written —
-    a bit column storing a null is reported with the false it was read
-    as, a null ntext value with '<null>' — as documented for the
-    'GameData' table in docs/data-mapping.md: 'A warning containing the
-    values of subsequent ignored duplicate rows will be shown'. The
-    column values of the first read row win. The table has no identity
+    result') and its column values as stored — a bit column storing
+    a null is reported with the false it was read as, a null string
+    column value with '<null>' — as documented for the 'GameData' table
+    in docs/data-mapping.md: 'A warning containing the values of
+    subsequent ignored duplicate rows will be shown'. The column values
+    of the first read row win. The table has no identity
     column and no documented sort ('SortOrderRoom', 'SortOrderCharacters'
     and 'SortOrderInventory' are plain int columns, not ordering
     directives), so the expanded row is always the first row of the
     unsorted read result.
 
     When the table is empty altogether (e.g. in a formatted RAGS file),
-    the file is still written, with every column key holding a YAML null
-    (the bit columns are then not mapped to booleans, since there is no
-    row whose values could be read).
+    the file is still written, with every string column key holding the
+    empty string and every integer and bit column key holding a YAML
+    null (the bit columns are then not mapped to booleans, since there
+    is no row whose values could be read).
 
     The output folder is silently created when it is missing and the
     written file silently overwrites any existing one.
@@ -280,27 +285,28 @@ function Expand-GameDataFromRagsFile {
         Write-Warning "Ignoring the GameData row $($readRowNumber) of the read result: the GameData table is expected to hold a single row, so only the first read row is expanded. The ignored row has the column values $($evidenceParts -join ', ')."
     }
 
-    # Column values, computed before the mapping is built. When
-    # no row was read every value stays null: an empty GameData table is
-    # expanded into an all-null mapping (whereas a read row maps its null
-    # bit columns to false, per the documented reading of missing bit
-    # values).
-    $title = $null
-    $openingMessage = $null
+    # Column values, computed before the mapping is built. When no row
+    # was read, the string column values stage the empty string while
+    # the integer and Boolean column values stay null: an empty GameData
+    # table is expanded into a mapping whose string column keys hold ''
+    # (whereas a read row maps its null bit columns to false, per the
+    # documented reading of missing bit values).
+    $title = ''
+    $openingMessage = ''
     $hideMainPicDisplay = $null
     $useInlineImages = $null
     $hidePortrait = $null
-    $authorName = $null
-    $gameVersion = $null
-    $gameInformation = $null
-    $bgMusic = $null
+    $authorName = ''
+    $gameVersion = ''
+    $gameInformation = ''
+    $bgMusic = ''
     $repeatbgMusic = $null
     $passwordProtected = $null
-    $gamePassword = $null
-    $objectVersionNumber = $null
-    $gameFont = $null
-    $roomGroups = $null
-    $clothingZoneLevels = $null
+    $gamePassword = ''
+    $objectVersionNumber = ''
+    $gameFont = ''
+    $roomGroups = ''
+    $clothingZoneLevels = ''
     $notificationsOff = $null
     $sortOrderRoom = $null
     $sortOrderCharacters = $null
@@ -310,7 +316,7 @@ function Expand-GameDataFromRagsFile {
         # The nvarchar columns are emitted as YAML strings.
         $title = $row['Title']
         if (($null -eq $title) -or ($title -is [System.DBNull])) {
-            $title = $null
+            $title = ''
         }
         else {
             $title = [string]$title
@@ -318,7 +324,7 @@ function Expand-GameDataFromRagsFile {
 
         $authorName = $row['AuthorName']
         if (($null -eq $authorName) -or ($authorName -is [System.DBNull])) {
-            $authorName = $null
+            $authorName = ''
         }
         else {
             $authorName = [string]$authorName
@@ -326,7 +332,7 @@ function Expand-GameDataFromRagsFile {
 
         $gameVersion = $row['GameVersion']
         if (($null -eq $gameVersion) -or ($gameVersion -is [System.DBNull])) {
-            $gameVersion = $null
+            $gameVersion = ''
         }
         else {
             $gameVersion = [string]$gameVersion
@@ -334,7 +340,7 @@ function Expand-GameDataFromRagsFile {
 
         $bgMusic = $row['bgMusic']
         if (($null -eq $bgMusic) -or ($bgMusic -is [System.DBNull])) {
-            $bgMusic = $null
+            $bgMusic = ''
         }
         else {
             $bgMusic = [string]$bgMusic
@@ -342,7 +348,7 @@ function Expand-GameDataFromRagsFile {
 
         $gamePassword = $row['GamePassword']
         if (($null -eq $gamePassword) -or ($gamePassword -is [System.DBNull])) {
-            $gamePassword = $null
+            $gamePassword = ''
         }
         else {
             $gamePassword = [string]$gamePassword
@@ -350,7 +356,7 @@ function Expand-GameDataFromRagsFile {
 
         $objectVersionNumber = $row['ObjectVersionNumber']
         if (($null -eq $objectVersionNumber) -or ($objectVersionNumber -is [System.DBNull])) {
-            $objectVersionNumber = $null
+            $objectVersionNumber = ''
         }
         else {
             $objectVersionNumber = [string]$objectVersionNumber
@@ -358,7 +364,7 @@ function Expand-GameDataFromRagsFile {
 
         $gameFont = $row['GameFont']
         if (($null -eq $gameFont) -or ($gameFont -is [System.DBNull])) {
-            $gameFont = $null
+            $gameFont = ''
         }
         else {
             $gameFont = [string]$gameFont
@@ -369,7 +375,7 @@ function Expand-GameDataFromRagsFile {
         # line feeds only when the written YAML is read back.
         $openingMessage = $row['OpeningMessage']
         if (($null -eq $openingMessage) -or ($openingMessage -is [System.DBNull])) {
-            $openingMessage = $null
+            $openingMessage = ''
         }
         else {
             $openingMessage = [string]$openingMessage
@@ -377,7 +383,7 @@ function Expand-GameDataFromRagsFile {
 
         $gameInformation = $row['GameInformation']
         if (($null -eq $gameInformation) -or ($gameInformation -is [System.DBNull])) {
-            $gameInformation = $null
+            $gameInformation = ''
         }
         else {
             $gameInformation = [string]$gameInformation
@@ -385,7 +391,7 @@ function Expand-GameDataFromRagsFile {
 
         $roomGroups = $row['RoomGroups']
         if (($null -eq $roomGroups) -or ($roomGroups -is [System.DBNull])) {
-            $roomGroups = $null
+            $roomGroups = ''
         }
         else {
             $roomGroups = [string]$roomGroups
@@ -393,7 +399,7 @@ function Expand-GameDataFromRagsFile {
 
         $clothingZoneLevels = $row['ClothingZoneLevels']
         if (($null -eq $clothingZoneLevels) -or ($clothingZoneLevels -is [System.DBNull])) {
-            $clothingZoneLevels = $null
+            $clothingZoneLevels = ''
         }
         else {
             $clothingZoneLevels = [string]$clothingZoneLevels
@@ -482,7 +488,7 @@ function Expand-GameDataFromRagsFile {
     }
 
     $filePath = Join-Path $OutputPath 'GameData.yaml'
-    Write-Verbose "Writing '$filePath'$(if ($null -eq $row) { ' from an empty GameData table (an all-null mapping).' } else { ' from the first read row' + $(if ($rows.Count -gt 1) { " ($($rows.Count - 1) further row$(if ($rows.Count -eq 2) { '' } else { 's'}) ignored)." } else { '.' }) })."
+    Write-Verbose "Writing '$filePath'$(if ($null -eq $row) { ' from an empty GameData table (empty-string string keys and null integer and bit keys).' } else { ' from the first read row' + $(if ($rows.Count -gt 1) { " ($($rows.Count - 1) further row$(if ($rows.Count -eq 2) { '' } else { 's'}) ignored)." } else { '.' }) })."
     [System.IO.File]::WriteAllText($filePath, $fileYaml, [System.Text.UTF8Encoding]::new($false))
 
     Write-Verbose 'Expanded the GameData data.'

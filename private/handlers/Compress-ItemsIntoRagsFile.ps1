@@ -128,8 +128,10 @@ function Compress-ItemsIntoRagsFile {
       the not-null table column documents as its default value, with a
       warning (an expansion never emits such an entry). A present
       Important value follows the bit column rules above.
-    - Null text, Description, LocationType and Weight values are stored
-      as database nulls.
+    - Null text and Description values are stored as the empty string,
+      mirroring the null-string emission rule of the expansion (a null
+      column value is emitted as the empty string); a null LocationType
+      or Weight value is stored as a database null.
     - Keys of an entry other than the twenty-five column names are
       ignored with a warning.
 
@@ -413,11 +415,16 @@ function Compress-ItemsIntoRagsFile {
         # expected to be the string scalar the expansion wrote. Every
         # remaining column value is derived BEFORE the duplicate check
         # below, so that the warning of the check reports the values of
-        # the ignored duplicate entry. A null value is stored as a
-        # database null, except for the bit columns, where a null is
-        # stored as the documented false.
+        # the ignored duplicate entry — the evidence therefore tests the
+        # raw parsed value ($<column>Value), not the staged one, so a
+        # null keeps its '<null>' citation, while a null text value
+        # stages the empty string, mirroring the null-string emission
+        # rule of the expansion (a null column value is emitted as the
+        # empty string). A null value of the LocationType and Weight
+        # columns is stored as a database null, and a null of the bit
+        # columns as the documented false.
         $nameValue = $entryValue['Name']
-        $name = $null
+        $name = ''
         if ($null -ne $nameValue) {
             if ($nameValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Items data of the RAGS file: the Name of the entry $($entryIndex + 1) of the file 'Items.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -452,9 +459,10 @@ function Compress-ItemsIntoRagsFile {
         # double-quoted escape arrives as-is). Like every ntext column
         # it holds no length limit to truncate to, and the value is
         # derived BEFORE the duplicate evidence below so that the
-        # warning reports the recorded value.
+        # warning reports the recorded value (the evidence tests this
+        # raw parsed value, not the staged one).
         $descriptionValue = $entryValue['Description']
-        $description = $null
+        $description = ''
         if ($null -ne $descriptionValue) {
             if ($descriptionValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Items data of the RAGS file: the Description of the entry $($entryIndex + 1) of the file 'Items.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -477,7 +485,7 @@ function Compress-ItemsIntoRagsFile {
         }
 
         $sdescValue = $entryValue['SDesc']
-        $sdesc = $null
+        $sdesc = ''
         if ($null -ne $sdescValue) {
             if ($sdescValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Items data of the RAGS file: the SDesc of the entry $($entryIndex + 1) of the file 'Items.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -505,7 +513,7 @@ function Compress-ItemsIntoRagsFile {
         }
 
         $prepositionValue = $entryValue['Preposition']
-        $preposition = $null
+        $preposition = ''
         if ($null -ne $prepositionValue) {
             if ($prepositionValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Items data of the RAGS file: the Preposition of the entry $($entryIndex + 1) of the file 'Items.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -533,7 +541,7 @@ function Compress-ItemsIntoRagsFile {
         }
 
         $locationNameValue = $entryValue['LocationName']
-        $locationName = $null
+        $locationName = ''
         if ($null -ne $locationNameValue) {
             if ($locationNameValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Items data of the RAGS file: the LocationName of the entry $($entryIndex + 1) of the file 'Items.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -1031,7 +1039,7 @@ function Compress-ItemsIntoRagsFile {
         }
 
         $groupNameValue = $entryValue['GroupName']
-        $groupName = $null
+        $groupName = ''
         if ($null -ne $groupNameValue) {
             if ($groupNameValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Items data of the RAGS file: the GroupName of the entry $($entryIndex + 1) of the file 'Items.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -1144,11 +1152,11 @@ function Compress-ItemsIntoRagsFile {
         }
         if ($duplicate) {
             $evidenceParts = [System.Collections.Generic.List[string]]::new()
-            if ($null -eq $name) { $evidenceParts.Add('Name <null>') } else { $evidenceParts.Add('Name ''' + $name + '''') }
-            if ($null -eq $description) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $description) }
-            if ($null -eq $sdesc) { $evidenceParts.Add('SDesc <null>') } else { $evidenceParts.Add('SDesc ''' + $sdesc + '''') }
-            if ($null -eq $preposition) { $evidenceParts.Add('Preposition <null>') } else { $evidenceParts.Add('Preposition ''' + $preposition + '''') }
-            if ($null -eq $locationName) { $evidenceParts.Add('LocationName <null>') } else { $evidenceParts.Add('LocationName ''' + $locationName + '''') }
+            if ($null -eq $nameValue) { $evidenceParts.Add('Name <null>') } else { $evidenceParts.Add('Name ''' + $name + '''') }
+            if ($null -eq $descriptionValue) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $description) }
+            if ($null -eq $sdescValue) { $evidenceParts.Add('SDesc <null>') } else { $evidenceParts.Add('SDesc ''' + $sdesc + '''') }
+            if ($null -eq $prepositionValue) { $evidenceParts.Add('Preposition <null>') } else { $evidenceParts.Add('Preposition ''' + $preposition + '''') }
+            if ($null -eq $locationNameValue) { $evidenceParts.Add('LocationName <null>') } else { $evidenceParts.Add('LocationName ''' + $locationName + '''') }
             if ($null -eq $locationType) { $evidenceParts.Add('LocationType <null>') } else { $evidenceParts.Add('LocationType ' + $locationType) }
             $evidenceParts.Add('Carryable equals ' + $carryable + ' after reading')
             $evidenceParts.Add('Wearable equals ' + $wearable + ' after reading')
@@ -1166,7 +1174,7 @@ function Compress-ItemsIntoRagsFile {
             $evidenceParts.Add('Visible equals ' + $visible + ' after reading')
             $evidenceParts.Add('EnterFirstTime equals ' + $enterFirstTime + ' after reading')
             $evidenceParts.Add('LeaveFirstTime equals ' + $leaveFirstTime + ' after reading')
-            if ($null -eq $groupName) { $evidenceParts.Add('GroupName <null>') } else { $evidenceParts.Add('GroupName ''' + $groupName + '''') }
+            if ($null -eq $groupNameValue) { $evidenceParts.Add('GroupName <null>') } else { $evidenceParts.Add('GroupName ''' + $groupName + '''') }
             $evidenceParts.Add('Important equals ' + $important + ' after reading')
 
             Write-Warning "Skipping the entry $($entryIndex + 1) of the file 'Items.yaml' of the source folder: the UniqueID value '$uniqueId' duplicates the UniqueID value of a previously read entry (whose column values win). The ignored duplicate entry has the column values $($evidenceParts -join ', ')."
@@ -1230,51 +1238,28 @@ function Compress-ItemsIntoRagsFile {
                     $null = $command.Parameters.Add($uniqueIdParameter)
 
                     $nameParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@name', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.Name) {
-                        # A parameter value of $null means 'not supplied',
-                        # so a null column value is bound as a database
-                        # null.
-                        $nameParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $nameParameter.Value = $stagedRow.Name
-                    }
+                    # The staged text values of the handler are always
+                    # strings, so the text parameters bind their staged
+                    # values directly (a null source value stages the
+                    # empty string); the LocationType and Weight
+                    # parameters keep their database-null branches.
+                    $nameParameter.Value = $stagedRow.Name
                     $null = $command.Parameters.Add($nameParameter)
 
                     $descriptionParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@description', [System.Data.SqlDbType]::NText)
-                    if ($null -eq $stagedRow.Description) {
-                        $descriptionParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $descriptionParameter.Value = $stagedRow.Description
-                    }
+                    $descriptionParameter.Value = $stagedRow.Description
                     $null = $command.Parameters.Add($descriptionParameter)
 
                     $sdescParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@sdesc', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.SDesc) {
-                        $sdescParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $sdescParameter.Value = $stagedRow.SDesc
-                    }
+                    $sdescParameter.Value = $stagedRow.SDesc
                     $null = $command.Parameters.Add($sdescParameter)
 
                     $prepositionParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@preposition', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.Preposition) {
-                        $prepositionParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $prepositionParameter.Value = $stagedRow.Preposition
-                    }
+                    $prepositionParameter.Value = $stagedRow.Preposition
                     $null = $command.Parameters.Add($prepositionParameter)
 
                     $locationNameParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@locationname', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.LocationName) {
-                        $locationNameParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $locationNameParameter.Value = $stagedRow.LocationName
-                    }
+                    $locationNameParameter.Value = $stagedRow.LocationName
                     $null = $command.Parameters.Add($locationNameParameter)
 
                     $locationTypeParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@locationtype', [System.Data.SqlDbType]::Int)
@@ -1360,12 +1345,7 @@ function Compress-ItemsIntoRagsFile {
                     $null = $command.Parameters.Add($leaveFirstTimeParameter)
 
                     $groupNameParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@groupname', [System.Data.SqlDbType]::NVarChar, 255)
-                    if ($null -eq $stagedRow.GroupName) {
-                        $groupNameParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $groupNameParameter.Value = $stagedRow.GroupName
-                    }
+                    $groupNameParameter.Value = $stagedRow.GroupName
                     $null = $command.Parameters.Add($groupNameParameter)
 
                     $importantParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@important', [System.Data.SqlDbType]::Bit)

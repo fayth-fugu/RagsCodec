@@ -109,9 +109,10 @@ function Compress-ItemPropertiesIntoRagsFile {
       the ignored property). Property names which differ only in
       character case are distinct properties, both within one entry and
       across the entries of one item.
-    - A property Value which is missing or null is stored as a database
-      null without a warning, as the expansion emits a YAML null for a
-      null Value column. A property Value which is a scalar but not a
+    - A property Value which is missing or null is stored as the empty
+      string without a warning, mirroring the null-string emission rule
+      of the expansion (a null Value value is emitted as the empty
+      string). A property Value which is a scalar but not a
       string (a hand-edited unquoted number, for example) is coerced to
       its string form with a warning; the string form of
       format-sensitive values is derived with the invariant culture, so
@@ -576,16 +577,21 @@ function Compress-ItemPropertiesIntoRagsFile {
                 $propertyName = $propertyName.Substring(0, 250)
             }
 
-            # A null Value value is a meaningful property value (it is
-            # stored as a database null); every other value is stored as a
-            # string, except for non-string scalars which are coerced to
-            # their invariant string form (format-sensitive values
-            # therefore round-trip through hosts of different cultures).
-            # The value is derived BEFORE the duplicate check below, so
-            # that the warning of the check reports the value of the
-            # ignored property.
+            # A null Value value is stored as the empty string without a
+            # warning, mirroring the null-string emission rule of the
+            # expansion (a null Value value is emitted as the empty
+            # string); every other value is stored as a string, except
+            # for non-string scalars which are coerced to their invariant
+            # string form (format-sensitive values therefore round-trip
+            # through hosts of different cultures). The value is derived
+            # BEFORE the duplicate check below, so that the warning of
+            # the check reports the value of the ignored property — the
+            # duplicate evidence tests the raw parsed value
+            # ($propertyDataValue), not the staged one, so a null keeps
+            # its '<null>' citation even though its staged value is the
+            # empty string.
             $propertyDataValue = $propertyValue['Value']
-            $storableValue = $null
+            $storableValue = ''
             if ($null -ne $propertyDataValue) {
                 if ($propertyDataValue -is [string]) {
                     $storableValue = $propertyDataValue
@@ -617,7 +623,7 @@ function Compress-ItemPropertiesIntoRagsFile {
             # by every entry of the item, including merged case-mate
             # entries.
             if (-not $nameSet.Add($propertyName)) {
-                Write-Warning "Skipping the property $($propertyIndex + 1) of the entry $($entryIndex + 1) for item '$stagedItemId': the property name '$propertyName' duplicates the property name of a previously read property (whose value wins). The ignored duplicate property has the value $(if ($null -eq $storableValue) { '<null>' } else { $storableValue })."
+                Write-Warning "Skipping the property $($propertyIndex + 1) of the entry $($entryIndex + 1) for item '$stagedItemId': the property name '$propertyName' duplicates the property name of a previously read property (whose value wins). The ignored duplicate property has the value $(if ($null -eq $propertyDataValue) { '<null>' } else { $storableValue })."
                 continue
             }
 
@@ -662,15 +668,10 @@ function Compress-ItemPropertiesIntoRagsFile {
                     $null = $command.Parameters.Add($nameParameter)
 
                     $valueParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@value', [System.Data.SqlDbType]::NText)
-                    if ($null -eq $stagedRow.Value) {
-                        # A parameter value of $null means 'not supplied',
-                        # so a null Value column is bound as a database
-                        # null.
-                        $valueParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $valueParameter.Value = $stagedRow.Value
-                    }
+                    # The staged Value value is always a string (a null
+                    # source value stages the empty string), so the
+                    # parameter binds the staged value directly.
+                    $valueParameter.Value = $stagedRow.Value
                     $null = $command.Parameters.Add($valueParameter)
 
                     $null = $command.ExecuteNonQuery()

@@ -116,7 +116,9 @@ function Compress-RoomsIntoRagsFile {
       value which is a boolean is stored as read; an integer scalar of
       1 or 0 is accepted with a warning; a value of any other type or
       content aborts the whole operation with an exception.
-    - Null text and Description values are stored as database nulls.
+    - Null text and Description values are stored as the empty string,
+      mirroring the null-string emission rule of the expansion (a null
+      column value is emitted as the empty string).
     - Keys of an entry other than the nine column names are ignored
       with a warning.
 
@@ -415,9 +417,13 @@ function Compress-RoomsIntoRagsFile {
         # double-quoted escape arrives as-is). Like every ntext column
         # it holds no length limit to truncate to, and the value is
         # derived BEFORE the duplicate evidence below so that the
-        # warning reports the recorded value.
+        # warning reports the recorded value. A null text value stages
+        # the empty string, mirroring the null-string emission rule of
+        # the expansion (a null column value is emitted as the empty
+        # string); the duplicate evidence tests the raw parsed value,
+        # not the staged one.
         $descriptionValue = $entryValue['Description']
-        $description = $null
+        $description = ''
         if ($null -ne $descriptionValue) {
             if ($descriptionValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Rooms data of the RAGS file: the Description of the entry $($entryIndex + 1) of the file 'Rooms.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -440,7 +446,7 @@ function Compress-RoomsIntoRagsFile {
         }
 
         $sdescValue = $entryValue['SDesc']
-        $sdesc = $null
+        $sdesc = ''
         if ($null -ne $sdescValue) {
             if ($sdescValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Rooms data of the RAGS file: the SDesc of the entry $($entryIndex + 1) of the file 'Rooms.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -468,7 +474,7 @@ function Compress-RoomsIntoRagsFile {
         }
 
         $nameValue = $entryValue['Name']
-        $name = $null
+        $name = ''
         if ($null -ne $nameValue) {
             if ($nameValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Rooms data of the RAGS file: the Name of the entry $($entryIndex + 1) of the file 'Rooms.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -508,7 +514,7 @@ function Compress-RoomsIntoRagsFile {
         # (the expansion warns the same way per written value) and is
         # then stored lowercased.
         $roomPicValue = $entryValue['RoomPic']
-        $roomPic = $null
+        $roomPic = ''
         if ($null -ne $roomPicValue) {
             if ($roomPicValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Rooms data of the RAGS file: the RoomPic of the entry $($entryIndex + 1) of the file 'Rooms.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -602,7 +608,7 @@ function Compress-RoomsIntoRagsFile {
         # two picture columns only, docs/data-mapping.md, Rooms
         # section).
         $groupValue = $entryValue['Group']
-        $group = $null
+        $group = ''
         if ($null -ne $groupValue) {
             if ($groupValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Rooms data of the RAGS file: the Group of the entry $($entryIndex + 1) of the file 'Rooms.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -632,7 +638,7 @@ function Compress-RoomsIntoRagsFile {
         # The LayeredRoomPic value follows the RoomPic rules, its 'None'
         # passthrough documented for the column itself.
         $layeredRoomPicValue = $entryValue['LayeredRoomPic']
-        $layeredRoomPic = $null
+        $layeredRoomPic = ''
         if ($null -ne $layeredRoomPicValue) {
             if ($layeredRoomPicValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Rooms data of the RAGS file: the LayeredRoomPic of the entry $($entryIndex + 1) of the file 'Rooms.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -713,14 +719,14 @@ function Compress-RoomsIntoRagsFile {
         }
         if ($duplicate) {
             $evidenceParts = [System.Collections.Generic.List[string]]::new()
-            if ($null -eq $description) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $description) }
-            if ($null -eq $sdesc) { $evidenceParts.Add('SDesc <null>') } else { $evidenceParts.Add('SDesc ''' + $sdesc + '''') }
-            if ($null -eq $name) { $evidenceParts.Add('Name <null>') } else { $evidenceParts.Add('Name ''' + $name + '''') }
-            if ($null -eq $roomPic) { $evidenceParts.Add('RoomPic <null>') } else { $evidenceParts.Add('RoomPic ''' + $roomPic + '''') }
+            if ($null -eq $descriptionValue) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $description) }
+            if ($null -eq $sdescValue) { $evidenceParts.Add('SDesc <null>') } else { $evidenceParts.Add('SDesc ''' + $sdesc + '''') }
+            if ($null -eq $nameValue) { $evidenceParts.Add('Name <null>') } else { $evidenceParts.Add('Name ''' + $name + '''') }
+            if ($null -eq $roomPicValue) { $evidenceParts.Add('RoomPic <null>') } else { $evidenceParts.Add('RoomPic ''' + $roomPic + '''') }
             $evidenceParts.Add('EnterFirstTime equals ' + $enterFirstTime + ' after reading')
             $evidenceParts.Add('LeaveFirstTime equals ' + $leaveFirstTime + ' after reading')
-            if ($null -eq $group) { $evidenceParts.Add('Group <null>') } else { $evidenceParts.Add('Group ''' + $group + '''') }
-            if ($null -eq $layeredRoomPic) { $evidenceParts.Add('LayeredRoomPic <null>') } else { $evidenceParts.Add('LayeredRoomPic ''' + $layeredRoomPic + '''') }
+            if ($null -eq $groupValue) { $evidenceParts.Add('Group <null>') } else { $evidenceParts.Add('Group ''' + $group + '''') }
+            if ($null -eq $layeredRoomPicValue) { $evidenceParts.Add('LayeredRoomPic <null>') } else { $evidenceParts.Add('LayeredRoomPic ''' + $layeredRoomPic + '''') }
 
             Write-Warning "Skipping the entry $($entryIndex + 1) of the file 'Rooms.yaml' of the source folder: the UniqueID value '$uniqueId' duplicates the UniqueID value of a previously read entry (whose column values win). The ignored duplicate entry has the column values $($evidenceParts -join ', ')."
             continue
@@ -767,42 +773,23 @@ function Compress-RoomsIntoRagsFile {
                     $null = $command.Parameters.Add($uidParameter)
 
                     $descParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@desc', [System.Data.SqlDbType]::NText)
-                    if ($null -eq $stagedRow.Description) {
-                        # A parameter value of $null means 'not supplied',
-                        # so a null column value is bound as a database
-                        # null.
-                        $descParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $descParameter.Value = $stagedRow.Description
-                    }
+                    # The staged text values of the handler are always
+                    # strings, so the text parameters bind their staged
+                    # values directly (a null source value stages the
+                    # empty string).
+                    $descParameter.Value = $stagedRow.Description
                     $null = $command.Parameters.Add($descParameter)
 
                     $sdescParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@sdesc', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.SDesc) {
-                        $sdescParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $sdescParameter.Value = $stagedRow.SDesc
-                    }
+                    $sdescParameter.Value = $stagedRow.SDesc
                     $null = $command.Parameters.Add($sdescParameter)
 
                     $nameParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@name', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.Name) {
-                        $nameParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $nameParameter.Value = $stagedRow.Name
-                    }
+                    $nameParameter.Value = $stagedRow.Name
                     $null = $command.Parameters.Add($nameParameter)
 
                     $picParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@pic', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.RoomPic) {
-                        $picParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $picParameter.Value = $stagedRow.RoomPic
-                    }
+                    $picParameter.Value = $stagedRow.RoomPic
                     $null = $command.Parameters.Add($picParameter)
 
                     # A bit parameter requires a boolean value no matter
@@ -817,21 +804,11 @@ function Compress-RoomsIntoRagsFile {
                     $null = $command.Parameters.Add($leaveParameter)
 
                     $grpParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@grp', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.Group) {
-                        $grpParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $grpParameter.Value = $stagedRow.Group
-                    }
+                    $grpParameter.Value = $stagedRow.Group
                     $null = $command.Parameters.Add($grpParameter)
 
                     $layerParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@layer', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.LayeredRoomPic) {
-                        $layerParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $layerParameter.Value = $stagedRow.LayeredRoomPic
-                    }
+                    $layerParameter.Value = $stagedRow.LayeredRoomPic
                     $null = $command.Parameters.Add($layerParameter)
 
                     $null = $command.ExecuteNonQuery()

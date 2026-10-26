@@ -52,12 +52,13 @@ function Compress-StatusBarItemsIntoRagsFile {
     - Entries which are null are skipped with a warning. An entry which
       is not a mapping aborts the whole operation with an exception, as
       no meaningful row can be derived from it.
-    - A Name value which is missing or null is stored as a database null
-      WITHOUT a warning, as the elected contract of this table's
-      expansion emits an entry for a row with a null, empty or
-      whitespace-only Name value instead of skipping it. Such an entry is
-      therefore compressed back verbatim: its Name is a database null
-      (missing or null value), the empty string or the verbatim
+    - A Name value which is missing or null is stored as the empty
+      string WITHOUT a warning, mirroring the null-string emission rule
+      of this table's expansion (which emits an entry for a row with a
+      null, empty or whitespace-only Name value instead of skipping
+      it, writing a null Name value as the empty string). Such an entry
+      is therefore compressed back verbatim: its Name is the empty
+      string (missing, null or empty value) or the verbatim
       whitespace-only string, the empty string and a whitespace-only
       string being distinct from each other (no value is trimmed or
       otherwise normalized). A Name value which is a sequence or a
@@ -75,8 +76,12 @@ function Compress-StatusBarItemsIntoRagsFile {
       expansion family's verbatim contract — a multi-line value re-emits
       through a YAML literal block whose re-read normalizes the written
       breaks to line feeds, while a parsed carriage return from a
-      double-quoted '\r' escape arrives as-is). A Text value which is a
-      sequence or a mapping aborts the whole operation with an exception.
+      double-quoted '\r' escape arrives as-is). A Text value which is
+      missing or null is stored as the empty string without a warning,
+      mirroring the null-string emission rule of the expansion (a null
+      Text value is emitted as the empty string). A Text value which is
+      a sequence or a mapping aborts the whole operation with an
+      exception.
     - A Width value which is missing or null is stored as a database null
       without a warning, as the expansion emits a YAML null for a null
       Width column. A Width value which is an integer scalar is stored as
@@ -99,8 +104,9 @@ function Compress-StatusBarItemsIntoRagsFile {
     - An entry which repeats the Name value of a previously read entry is
       skipped with a warning which names the column values of the ignored
       duplicate entry (the column values of the first read entry win).
-      The duplicate comparison ignores character case and treats two
-      null Name values as equal, per the documented Unique rule for the
+      The duplicate comparison ignores character case and treats a null
+      Name value (which stages the empty string) as equal to the
+      empty-Name string, per the documented Unique rule for the
       'StatusBarItems' table in docs/data-mapping.md ('Values are
       case-insensitive'; 'Only the first detected casing will be read')
       and the 'StatusBarItems.Name' breaking-change convention which
@@ -361,7 +367,7 @@ function Compress-StatusBarItemsIntoRagsFile {
         # warning, mirroring the tolerant scalar ladder of the other
         # text columns.
         $nameValue = $entryValue['Name']
-        $name = $null
+        $name = ''
         if ($null -ne $nameValue) {
             if ($nameValue -is [System.Collections.IList]) {
                 throw "Cannot compress the StatusBarItems data of the RAGS file: the Name of the entry $($entryIndex + 1) of the file 'StatusBarItems.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -401,9 +407,11 @@ function Compress-StatusBarItemsIntoRagsFile {
         # feeds by the YAML parser). Like every ntext column it holds no
         # length limit to truncate to, and the value is derived BEFORE
         # the duplicate check below so that the warning of the check
-        # reports the normalized value of the ignored duplicate entry.
+        # reports the normalized value of the ignored duplicate entry
+        # (the evidence tests this raw parsed value, not the staged
+        # one).
         $textValue = $entryValue['Text']
-        $text = $null
+        $text = ''
         if ($null -ne $textValue) {
             if ($textValue -is [System.Collections.IList]) {
                 throw "Cannot compress the StatusBarItems data of the RAGS file: the Text of the entry $($entryIndex + 1) of the file 'StatusBarItems.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -575,7 +583,7 @@ function Compress-StatusBarItemsIntoRagsFile {
         if ($isDuplicate) {
             $evidenceParts = [System.Collections.Generic.List[string]]::new()
             $evidenceParts.Add("Name '$name'")
-            if ($null -eq $text) { $evidenceParts.Add('Text <null>') } else { $evidenceParts.Add('Text ' + $text) }
+            if ($null -eq $textValue) { $evidenceParts.Add('Text <null>') } else { $evidenceParts.Add('Text ' + $text) }
             if ($null -eq $width) { $evidenceParts.Add('Width <null>') } else { $evidenceParts.Add('Width ' + [string]$width) }
             if ($visible) { $evidenceParts.Add('Visible True') } else { $evidenceParts.Add('Visible False') }
 
@@ -615,25 +623,16 @@ function Compress-StatusBarItemsIntoRagsFile {
                     $command.CommandText = 'INSERT INTO [StatusBarItems] ([Name], [Text], [Width], [Visible]) VALUES (@name, @text, @width, @visible)'
 
                     $nameParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@name', [System.Data.SqlDbType]::NVarChar, 255)
-                    if ($null -eq $stagedRow.Name) {
-                        # A parameter value of $null means 'not supplied',
-                        # so a null column value is bound as a database
-                        # null (the elected contract of this table also
-                        # appends entries with a null Name value).
-                        $nameParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $nameParameter.Value = $stagedRow.Name
-                    }
+                    # The staged Name and Text values are always strings
+                    # (a null source value stages the empty string), so
+                    # the text parameters bind their staged values
+                    # directly; the Width parameter keeps its
+                    # database-null branch.
+                    $nameParameter.Value = $stagedRow.Name
                     $null = $command.Parameters.Add($nameParameter)
 
                     $textParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@text', [System.Data.SqlDbType]::NText)
-                    if ($null -eq $stagedRow.Text) {
-                        $textParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $textParameter.Value = $stagedRow.Text
-                    }
+                    $textParameter.Value = $stagedRow.Text
                     $null = $command.Parameters.Add($textParameter)
 
                     $widthParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@width', [System.Data.SqlDbType]::Int)

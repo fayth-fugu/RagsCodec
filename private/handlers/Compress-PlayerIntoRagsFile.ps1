@@ -33,8 +33,9 @@ function Compress-PlayerIntoRagsFile {
     - Keys of the document other than the eleven table columns are
       ignored with a warning.
     - A text column value (Name, CurrentRoom, PlayerLayeredImage) which
-      is missing or null is stored as a database null without a warning,
-      as the expansion emits a YAML null for a null column. A value
+      is missing or null is stored as the empty string without a
+      warning, mirroring the null-string emission rule of the expansion
+      (a null column value is emitted as the empty string). A value
       which is a scalar but not a string (a hand-edited unquoted number,
       for example) is coerced to its string form with a warning; the
       string form of format-sensitive values is derived with the
@@ -82,7 +83,7 @@ function Compress-PlayerIntoRagsFile {
       the whole operation with an exception.
     - A mapping which defines none of the column keys (an empty mapping,
       such as the one the expansion writes for an empty Player table)
-      still contributes one row of database-null text values and false
+      still contributes one row of empty-string text values and false
       bit values. Note that re-expanding such a row then yields the
       values the row was stored with (the false bit values), never the
       all-null mapping again: a stored false bit cannot be distinguished
@@ -240,9 +241,10 @@ function Compress-PlayerIntoRagsFile {
 
     # The nvarchar columns are stored as their YAML strings, with
     # format-sensitive scalars coerced through their invariant string
-    # form.
+    # form; a missing or null value stages the empty string, mirroring
+    # the null-string emission rule of the expansion.
     $nameValue = $rootDocument['Name']
-    $name = $null
+    $name = ''
     if ($null -ne $nameValue) {
         if ($nameValue -is [System.Collections.IList]) {
             throw "Cannot compress the Player data of the RAGS file: the Name of the file 'Player.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -273,7 +275,7 @@ function Compress-PlayerIntoRagsFile {
     # scalar coercion as the text columns but no length limit to truncate
     # to (the verbatim contract of the expansion family).
     $descriptionValue = $rootDocument['Description']
-    $description = $null
+    $description = ''
     if ($null -ne $descriptionValue) {
         if ($descriptionValue -is [System.Collections.IList]) {
             throw "Cannot compress the Player data of the RAGS file: the Description of the file 'Player.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -304,7 +306,7 @@ function Compress-PlayerIntoRagsFile {
     # the same way per written value during expansion, so a hand-edited
     # mixed-case value never reaches the database unflagged.
     $startingRoomValue = $rootDocument['StartingRoom']
-    $startingRoom = $null
+    $startingRoom = ''
     if ($null -ne $startingRoomValue) {
         if ($startingRoomValue -is [System.Collections.IList]) {
             throw "Cannot compress the Player data of the RAGS file: the StartingRoom of the file 'Player.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -338,7 +340,7 @@ function Compress-PlayerIntoRagsFile {
     }
 
     $currentRoomValue = $rootDocument['CurrentRoom']
-    $currentRoom = $null
+    $currentRoom = ''
     if ($null -ne $currentRoomValue) {
         if ($currentRoomValue -is [System.Collections.IList]) {
             throw "Cannot compress the Player data of the RAGS file: the CurrentRoom of the file 'Player.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -366,7 +368,7 @@ function Compress-PlayerIntoRagsFile {
     }
 
     $playerLayeredImageValue = $rootDocument['PlayerLayeredImage']
-    $playerLayeredImage = $null
+    $playerLayeredImage = ''
     if ($null -ne $playerLayeredImageValue) {
         if ($playerLayeredImageValue -is [System.Collections.IList]) {
             throw "Cannot compress the Player data of the RAGS file: the PlayerLayeredImage of the file 'Player.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -398,7 +400,7 @@ function Compress-PlayerIntoRagsFile {
     # differs from its lowercase form (the expansion warns the same way
     # per written value during expansion).
     $playerPortraitValue = $rootDocument['PlayerPortrait']
-    $playerPortrait = $null
+    $playerPortrait = ''
     if ($null -ne $playerPortraitValue) {
         if ($playerPortraitValue -is [System.Collections.IList]) {
             throw "Cannot compress the Player data of the RAGS file: the PlayerPortrait of the file 'Player.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -622,7 +624,7 @@ function Compress-PlayerIntoRagsFile {
     # appended per source file — also for a mapping which defines none
     # of the column keys (an empty mapping, such as the one the
     # expansion writes for an empty Player table), which contributes one
-    # row of database-null text values and false bit values.
+    # row of empty-string text values and false bit values.
     $stagedRows = [System.Collections.Generic.List[object]]::new()
     $stagedRows.Add([pscustomobject]@{
         Name               = $name
@@ -655,50 +657,26 @@ function Compress-PlayerIntoRagsFile {
             $command.CommandText = 'INSERT INTO [Player] ([Name], [Description], [StartingRoom], [CurrentRoom], [PlayerLayeredImage], [PlayerGender], [PromptForName], [PromptForGender], [PlayerPortrait], [EnforceWeight], [WeightLimit]) VALUES (@name, @description, @startingroom, @currentroom, @playerlayeredimage, @playergender, @promptforname, @promptforgender, @playerportrait, @enforceweight, @weightlimit)'
 
             $nameParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@name', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $name) {
-                # A parameter value of $null means 'not supplied', so a
-                # null column value is bound as a database null.
-                $nameParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $nameParameter.Value = $name
-            }
+            # The staged text values are always strings, so the text
+            # parameters bind their staged values directly (a null
+            # source value stages the empty string).
+            $nameParameter.Value = $name
             $null = $command.Parameters.Add($nameParameter)
 
             $descriptionParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@description', [System.Data.SqlDbType]::NText)
-            if ($null -eq $description) {
-                $descriptionParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $descriptionParameter.Value = $description
-            }
+            $descriptionParameter.Value = $description
             $null = $command.Parameters.Add($descriptionParameter)
 
             $startingRoomParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@startingroom', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $startingRoom) {
-                $startingRoomParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $startingRoomParameter.Value = $startingRoom
-            }
+            $startingRoomParameter.Value = $startingRoom
             $null = $command.Parameters.Add($startingRoomParameter)
 
             $currentRoomParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@currentroom', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $currentRoom) {
-                $currentRoomParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $currentRoomParameter.Value = $currentRoom
-            }
+            $currentRoomParameter.Value = $currentRoom
             $null = $command.Parameters.Add($currentRoomParameter)
 
             $playerLayeredImageParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@playerlayeredimage', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $playerLayeredImage) {
-                $playerLayeredImageParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $playerLayeredImageParameter.Value = $playerLayeredImage
-            }
+            $playerLayeredImageParameter.Value = $playerLayeredImage
             $null = $command.Parameters.Add($playerLayeredImageParameter)
 
             $playerGenderParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@playergender', [System.Data.SqlDbType]::Int)
@@ -722,12 +700,7 @@ function Compress-PlayerIntoRagsFile {
             $null = $command.Parameters.Add($promptForGenderParameter)
 
             $playerPortraitParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@playerportrait', [System.Data.SqlDbType]::NVarChar, 250)
-            if ($null -eq $playerPortrait) {
-                $playerPortraitParameter.Value = [System.DBNull]::Value
-            }
-            else {
-                $playerPortraitParameter.Value = $playerPortrait
-            }
+            $playerPortraitParameter.Value = $playerPortrait
             $null = $command.Parameters.Add($playerPortraitParameter)
 
             # The WeightLimit parameter binds the normalized float value

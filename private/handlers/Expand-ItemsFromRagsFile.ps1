@@ -22,7 +22,9 @@ function Expand-ItemsFromRagsFile {
     feeds when the written YAML is read back, so a read-back description
     carries the line-feed form of whatever line breaks the table stores;
     the value itself is emitted verbatim. Every other null column value is
-    emitted as a YAML null.
+    emitted as a YAML null, except the null values of the string columns
+    (Name, Description, SDesc, Preposition, LocationName and GroupName),
+    which are emitted as the empty string.
 
     Rows are expected to hold distinct UniqueID values: the table is
     sorted by UniqueID ascending before it is read ("Table is sorted by
@@ -126,19 +128,26 @@ function Expand-ItemsFromRagsFile {
 
         # A null column value is written as a YAML null, except for the
         # bit columns, where a null is written as a YAML false (documented
-        # flag mapping). The Description value is staged verbatim (a YAML
-        # literal block scalar normalizes a written value's line breaks to
-        # line feeds only when the written YAML is read back). Every value
-        # is computed before the duplicate check so that the warnings below
-        # never read a value of a previous iteration (the stale-variable
-        # rule), and the duplicate warning cites the raw value of the
-        # ignored row.
+        # flag mapping), and except for the six string columns, where a
+        # null is written as the empty string. The Description value is
+        # staged verbatim (a YAML literal block scalar normalizes a
+        # written value's line breaks to line feeds only when the written
+        # YAML is read back). Every value is computed before the duplicate
+        # check so that the warnings below never read a value of a
+        # previous iteration (the stale-variable rule), and the duplicate
+        # warning cites the raw value of the ignored row (a null keeps its
+        # '<null>' citation even though its emitted value is the empty
+        # string).
         $name = $row['Name']
         if (($null -eq $name) -or ($name -is [System.DBNull])) {
             $name = $null
         }
         else {
             $name = [string]$name
+        }
+        $nameRaw = $name
+        if ($null -eq $name) {
+            $name = ''
         }
 
         $description = $row['Description']
@@ -148,6 +157,10 @@ function Expand-ItemsFromRagsFile {
         else {
             $description = [string]$description
         }
+        $descriptionRaw = $description
+        if ($null -eq $description) {
+            $description = ''
+        }
 
         $sdesc = $row['SDesc']
         if (($null -eq $sdesc) -or ($sdesc -is [System.DBNull])) {
@@ -155,6 +168,10 @@ function Expand-ItemsFromRagsFile {
         }
         else {
             $sdesc = [string]$sdesc
+        }
+        $sdescRaw = $sdesc
+        if ($null -eq $sdesc) {
+            $sdesc = ''
         }
 
         $preposition = $row['Preposition']
@@ -164,6 +181,10 @@ function Expand-ItemsFromRagsFile {
         else {
             $preposition = [string]$preposition
         }
+        $prepositionRaw = $preposition
+        if ($null -eq $preposition) {
+            $preposition = ''
+        }
 
         $locationName = $row['LocationName']
         if (($null -eq $locationName) -or ($locationName -is [System.DBNull])) {
@@ -171,6 +192,10 @@ function Expand-ItemsFromRagsFile {
         }
         else {
             $locationName = [string]$locationName
+        }
+        $locationNameRaw = $locationName
+        if ($null -eq $locationName) {
+            $locationName = ''
         }
 
         # A nullable integer column is written as a YAML null when the
@@ -276,6 +301,10 @@ function Expand-ItemsFromRagsFile {
         else {
             $groupName = [string]$groupName
         }
+        $groupNameRaw = $groupName
+        if ($null -eq $groupName) {
+            $groupName = ''
+        }
 
         # The Important column is not nullable, so the reader always
         # returns a Boolean value for it.
@@ -298,11 +327,11 @@ function Expand-ItemsFromRagsFile {
         }
         if ($duplicate) {
             $evidenceParts = [System.Collections.Generic.List[string]]::new()
-            if ($null -eq $name) { $evidenceParts.Add('Name <null>') } else { $evidenceParts.Add('Name ''' + $name + '''') }
-            if ($null -eq $description) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $description) }
-            if ($null -eq $sdesc) { $evidenceParts.Add('SDesc <null>') } else { $evidenceParts.Add('SDesc ''' + $sdesc + '''') }
-            if ($null -eq $preposition) { $evidenceParts.Add('Preposition <null>') } else { $evidenceParts.Add('Preposition ''' + $preposition + '''') }
-            if ($null -eq $locationName) { $evidenceParts.Add('LocationName <null>') } else { $evidenceParts.Add('LocationName ''' + $locationName + '''') }
+            if ($null -eq $nameRaw) { $evidenceParts.Add('Name <null>') } else { $evidenceParts.Add('Name ''' + $nameRaw + '''') }
+            if ($null -eq $descriptionRaw) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $descriptionRaw) }
+            if ($null -eq $sdescRaw) { $evidenceParts.Add('SDesc <null>') } else { $evidenceParts.Add('SDesc ''' + $sdescRaw + '''') }
+            if ($null -eq $prepositionRaw) { $evidenceParts.Add('Preposition <null>') } else { $evidenceParts.Add('Preposition ''' + $prepositionRaw + '''') }
+            if ($null -eq $locationNameRaw) { $evidenceParts.Add('LocationName <null>') } else { $evidenceParts.Add('LocationName ''' + $locationNameRaw + '''') }
             if ($null -eq $locationType) { $evidenceParts.Add('LocationType <null>') } else { $evidenceParts.Add('LocationType ' + $locationType) }
             $evidenceParts.Add('Carryable equals ' + $carryable + ' after reading')
             $evidenceParts.Add('Wearable equals ' + $wearable + ' after reading')
@@ -320,7 +349,7 @@ function Expand-ItemsFromRagsFile {
             $evidenceParts.Add('Visible equals ' + $visible + ' after reading')
             $evidenceParts.Add('EnterFirstTime equals ' + $enterFirstTime + ' after reading')
             $evidenceParts.Add('LeaveFirstTime equals ' + $leaveFirstTime + ' after reading')
-            if ($null -eq $groupName) { $evidenceParts.Add('GroupName <null>') } else { $evidenceParts.Add('GroupName ''' + $groupName + '''') }
+            if ($null -eq $groupNameRaw) { $evidenceParts.Add('GroupName <null>') } else { $evidenceParts.Add('GroupName ''' + $groupNameRaw + '''') }
             $evidenceParts.Add('Important equals ' + $important + ' after reading')
 
             Write-Warning "Skipping the Items row $($readRowNumber) of the read result: the UniqueID value '$uniqueId' duplicates the UniqueID value of a previously read row (whose column values win). The ignored duplicate row has the column values $($evidenceParts -join ', ')."

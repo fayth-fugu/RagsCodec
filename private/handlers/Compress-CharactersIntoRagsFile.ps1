@@ -64,8 +64,12 @@ function Compress-CharactersIntoRagsFile {
       hand-edited unquoted number, for example) is coerced to its string
       form with a warning; the string form of format-sensitive values is
       derived with the invariant culture, so such a value round-trips
-      through hosts of different cultures. This applies to the
-      CharnameOverride, CurrentRoom and CharPortrait values. The
+      through hosts of different cultures. A missing or null text column
+      value (of the CharnameOverride, CurrentRoom, Description and
+      CharPortrait values) is stored as the empty string without a
+      warning, mirroring the null-string emission rule of the expansion
+      (a null column value is emitted as the empty string). This applies
+      to the CharnameOverride, CurrentRoom and CharPortrait values. The
       CharnameOverride value is truncated to the 250 characters of
       its table column, the CharPortrait value to the 255 characters of
       its column; a text column value which is a sequence or a mapping
@@ -370,11 +374,15 @@ function Compress-CharactersIntoRagsFile {
         # Normalize the remaining eight column values to their storable
         # row values. Every value is derived BEFORE the duplicate check
         # below, so that the warning of the check reports the values of
-        # the ignored duplicate entry. A null value is stored as a
-        # database null, except for the three bit columns, where a null
-        # is stored as the documented false.
+        # the ignored duplicate entry — the evidence therefore tests the
+        # raw parsed value ($<column>Value), not the staged one, so a
+        # null keeps its '<null>' citation even though its staged value
+        # is the empty string, mirroring the null-string emission rule
+        # of the expansion. A null value of the CharGender column is
+        # stored as a database null, and a null value of the three bit
+        # columns as the documented false.
         $charnameOverrideValue = $entryValue['CharnameOverride']
-        $charnameOverride = $null
+        $charnameOverride = ''
         if ($null -ne $charnameOverrideValue) {
             if ($charnameOverrideValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Characters data of the RAGS file: the CharnameOverride of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -441,7 +449,7 @@ function Compress-CharactersIntoRagsFile {
         }
 
         $currentRoomValue = $entryValue['CurrentRoom']
-        $currentRoom = $null
+        $currentRoom = ''
         if ($null -ne $currentRoomValue) {
             if ($currentRoomValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Characters data of the RAGS file: the CurrentRoom of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -472,9 +480,10 @@ function Compress-CharactersIntoRagsFile {
         # escape arrives as-is). Like every ntext column it holds no
         # length limit to truncate to, and the value is derived BEFORE
         # the duplicate evidence below so that the warning reports the
-        # recorded value.
+        # recorded value (the evidence tests this raw parsed value, not
+        # the staged one).
         $descriptionValue = $entryValue['Description']
-        $description = $null
+        $description = ''
         if ($null -ne $descriptionValue) {
             if ($descriptionValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Characters data of the RAGS file: the Description of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -572,7 +581,7 @@ function Compress-CharactersIntoRagsFile {
         }
 
         $charPortraitValue = $entryValue['CharPortrait']
-        $charPortrait = $null
+        $charPortrait = ''
         if ($null -ne $charPortraitValue) {
             if ($charPortraitValue -is [System.Collections.IList]) {
                 throw "Cannot compress the Characters data of the RAGS file: the CharPortrait of the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder carries a sequence where a scalar value is expected."
@@ -635,14 +644,14 @@ function Compress-CharactersIntoRagsFile {
         }
         if ($duplicate) {
             $evidenceParts = [System.Collections.Generic.List[string]]::new()
-            if ($null -eq $charnameOverride) { $evidenceParts.Add('CharnameOverride <null>') } else { $evidenceParts.Add('CharnameOverride ''' + $charnameOverride + '''') }
+            if ($null -eq $charnameOverrideValue) { $evidenceParts.Add('CharnameOverride <null>') } else { $evidenceParts.Add('CharnameOverride ''' + $charnameOverride + '''') }
             if ($null -eq $charGender) { $evidenceParts.Add('CharGender <null>') } else { $evidenceParts.Add('CharGender ' + $charGender) }
-            if ($null -eq $currentRoom) { $evidenceParts.Add('CurrentRoom <null>') } else { $evidenceParts.Add('CurrentRoom ''' + $currentRoom + '''') }
-            if ($null -eq $description) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $description) }
+            if ($null -eq $currentRoomValue) { $evidenceParts.Add('CurrentRoom <null>') } else { $evidenceParts.Add('CurrentRoom ''' + $currentRoom + '''') }
+            if ($null -eq $descriptionValue) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $description) }
             $evidenceParts.Add('AllowInventoryInteraction equals ' + $allowInventoryInteraction + ' after reading')
             $evidenceParts.Add('EnterFirstTime equals ' + $enterFirstTime + ' after reading')
             $evidenceParts.Add('LeaveFirstTime equals ' + $leaveFirstTime + ' after reading')
-            if ($null -eq $charPortrait) { $evidenceParts.Add('CharPortrait <null>') } else { $evidenceParts.Add('CharPortrait ''' + $charPortrait + '''') }
+            if ($null -eq $charPortraitValue) { $evidenceParts.Add('CharPortrait <null>') } else { $evidenceParts.Add('CharPortrait ''' + $charPortrait + '''') }
 
             Write-Warning "Skipping the entry $($entryIndex + 1) of the file 'Characters.yaml' of the source folder: the Charname value '$charname' duplicates the Charname value of a previously read entry (whose column values win). The ignored duplicate entry has the column values $($evidenceParts -join ', ')."
             continue
@@ -689,15 +698,12 @@ function Compress-CharactersIntoRagsFile {
                     $null = $command.Parameters.Add($charnameParameter)
 
                     $charnameOverrideParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@charnameoverride', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.CharnameOverride) {
-                        # A parameter value of $null means 'not supplied',
-                        # so a null column value is bound as a database
-                        # null.
-                        $charnameOverrideParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $charnameOverrideParameter.Value = $stagedRow.CharnameOverride
-                    }
+                    # The staged text values of the handler are always
+                    # strings, so the text parameters bind their staged
+                    # values directly (a null source value stages the
+                    # empty string); the CharGender parameter keeps its
+                    # database-null branch.
+                    $charnameOverrideParameter.Value = $stagedRow.CharnameOverride
                     $null = $command.Parameters.Add($charnameOverrideParameter)
 
                     $charGenderParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@chargender', [System.Data.SqlDbType]::Int)
@@ -710,21 +716,11 @@ function Compress-CharactersIntoRagsFile {
                     $null = $command.Parameters.Add($charGenderParameter)
 
                     $currentRoomParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@currentroom', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.CurrentRoom) {
-                        $currentRoomParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $currentRoomParameter.Value = $stagedRow.CurrentRoom
-                    }
+                    $currentRoomParameter.Value = $stagedRow.CurrentRoom
                     $null = $command.Parameters.Add($currentRoomParameter)
 
                     $descriptionParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@description', [System.Data.SqlDbType]::NText)
-                    if ($null -eq $stagedRow.Description) {
-                        $descriptionParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $descriptionParameter.Value = $stagedRow.Description
-                    }
+                    $descriptionParameter.Value = $stagedRow.Description
                     $null = $command.Parameters.Add($descriptionParameter)
 
                     # A bit parameter requires a boolean value no matter
@@ -743,12 +739,7 @@ function Compress-CharactersIntoRagsFile {
                     $null = $command.Parameters.Add($leaveFirstTimeParameter)
 
                     $charPortraitParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@charportrait', [System.Data.SqlDbType]::NVarChar, 255)
-                    if ($null -eq $stagedRow.CharPortrait) {
-                        $charPortraitParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $charPortraitParameter.Value = $stagedRow.CharPortrait
-                    }
+                    $charPortraitParameter.Value = $stagedRow.CharPortrait
                     $null = $command.Parameters.Add($charPortraitParameter)
 
                     $null = $command.ExecuteNonQuery()

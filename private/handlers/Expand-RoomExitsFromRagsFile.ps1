@@ -59,8 +59,9 @@ function Expand-RoomExitsFromRagsFile {
     is always passed through verbatim during expansion and compression
     of PortalObjectName without coercion', docs/data-mapping.md,
     RoomExits section); the passthrough is case-insensitive, so any
-    casing of the value keeps its raw characters. Null DestinationRoom
-    and PortalObjectName values are kept as YAML null.
+    casing of the value keeps its raw characters; a null value never
+    matches the passthrough. Null DestinationRoom and PortalObjectName
+    values are emitted as the empty string.
 
     The output folder is silently created when it is missing and the
     written file silently overwrites any existing one. Rows of one room
@@ -200,13 +201,15 @@ function Expand-RoomExitsFromRagsFile {
 
         # The DestinationRoom value is always coerced to lowercase
         # (docs/data-mapping.md, RoomExits section, Lowercase
-        # enforcement), and staged verbatim otherwise. The lowercased
-        # value is assigned to a local before the duplicate check, so
-        # that the warning can report the lowercased value of the
-        # ignored row itself.
+        # enforcement), and staged verbatim otherwise; a null value is
+        # emitted as the empty string. The lowercased value is assigned
+        # to a local before the duplicate check, so that the warning can
+        # report the lowercased value of the ignored row itself (a null
+        # keeps its '<null>' citation even though its emitted value is
+        # the empty string, so the citation tests the raw value).
         $destinationRoom = $row['DestinationRoom']
         if (($null -eq $destinationRoom) -or ($destinationRoom -is [System.DBNull])) {
-            $stagedDestinationRoom = $null
+            $stagedDestinationRoom = ''
         }
         else {
             $stagedDestinationRoom = ([string]$destinationRoom).ToLowerInvariant()
@@ -219,10 +222,11 @@ function Expand-RoomExitsFromRagsFile {
         # without coercion', docs/data-mapping.md, RoomExits section).
         # The passthrough is case-insensitive, so any casing of the
         # value keeps its raw characters; every other value is
-        # lowercased.
+        # lowercased. A null value is emitted as the empty string and
+        # never matches the passthrough.
         $portalObjectName = $row['PortalObjectName']
         if (($null -eq $portalObjectName) -or ($portalObjectName -is [System.DBNull])) {
-            $stagedPortalObjectName = $null
+            $stagedPortalObjectName = ''
         }
         elseif ([string]::Equals([string]$portalObjectName, '<None>', [System.StringComparison]::OrdinalIgnoreCase)) {
             $stagedPortalObjectName = [string]$portalObjectName
@@ -267,13 +271,13 @@ function Expand-RoomExitsFromRagsFile {
             $duplicateEvidence = [System.Collections.Generic.List[string]]::new()
             $duplicateEvidence.Add("Direction $exitDirectionInt")
             $duplicateEvidence.Add("Active equals $active after reading")
-            if ($null -eq $stagedDestinationRoom) {
+            if (($null -eq $destinationRoom) -or ($destinationRoom -is [System.DBNull])) {
                 $duplicateEvidence.Add('DestinationRoom <null>')
             }
             else {
                 $duplicateEvidence.Add("DestinationRoom '$stagedDestinationRoom'")
             }
-            if ($null -eq $stagedPortalObjectName) {
+            if (($null -eq $portalObjectName) -or ($portalObjectName -is [System.DBNull])) {
                 $duplicateEvidence.Add('PortalObjectName <null>')
             }
             else {

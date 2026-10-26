@@ -17,8 +17,9 @@ function Expand-MediaGroupsFromRagsFile {
     columns of the MediaGroups table: the Name key and the Parent column value.
     Rows are sorted by Name and then by row ID before they are read, as
     documented ("Table is sorted first by Name ascending, then by ID
-    ascending", docs/data-mapping.md, MediaGroups section). Every null column
-    value is emitted as a YAML null.
+    ascending", docs/data-mapping.md, MediaGroups section). A null Parent
+    value is emitted as the empty string; every other null column value is
+    emitted as a YAML null.
 
     Rows are expected to hold distinct Name values: the table is sorted by
     Name before it is read, so for every row after the first whose Name
@@ -105,15 +106,22 @@ function Expand-MediaGroupsFromRagsFile {
         }
         $name = [string]$name
 
-        # A null column value is written as a YAML null. The Parent value is
-        # normalized before the duplicate check so that the warning below
-        # never reads a value of a previous iteration.
+        # A null Parent value is written as the empty string. The raw value
+        # is kept alongside because the duplicate warning below cites it
+        # (a null keeps its '<null>' citation even though its emitted
+        # value is the empty string), and the emitted value is normalized
+        # before the duplicate check so that the warning below never reads
+        # a value of a previous iteration.
         $parent = $row['Parent']
         if (($null -eq $parent) -or ($parent -is [System.DBNull])) {
             $parent = $null
         }
         else {
             $parent = [string]$parent
+        }
+        $parentRaw = $parent
+        if ($null -eq $parent) {
+            $parent = ''
         }
 
         # Soft-validate the Unique Name column: a row whose value compares
@@ -130,7 +138,7 @@ function Expand-MediaGroupsFromRagsFile {
             }
         }
         if ($duplicate) {
-            if ($null -eq $parent) { $parentEvidence = 'Parent <null>' } else { $parentEvidence = 'Parent ''' + $parent + '''' }
+            if ($null -eq $parentRaw) { $parentEvidence = 'Parent <null>' } else { $parentEvidence = 'Parent ''' + $parentRaw + '''' }
 
             Write-Warning "Skipping the MediaGroups row (ID '$rowId'): the Name value '$name' duplicates the Name value of a previously read row (whose column values win). The ignored duplicate row has the column values Name '$name', $parentEvidence."
             continue

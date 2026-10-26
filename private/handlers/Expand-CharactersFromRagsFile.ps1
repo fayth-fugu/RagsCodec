@@ -21,7 +21,10 @@ function Expand-CharactersFromRagsFile {
     normalizes a literal block's line breaks to line feeds when the written
     YAML is read back, so a read-back description carries the line-feed form
     of whatever line breaks the table stores; the value itself is emitted
-    verbatim. Every other null column value is emitted as a YAML null.
+    verbatim. Every other null column value is emitted as a YAML null,
+    except the null values of the string columns (CharnameOverride,
+    CurrentRoom, Description and CharPortrait), which are emitted as the
+    empty string.
 
     Rows are expected to hold distinct Charname values: the table is
     sorted by Charname ascending, as documented for the 'Characters' table
@@ -113,19 +116,26 @@ function Expand-CharactersFromRagsFile {
 
         # A null column value is written as a YAML null, except for the
         # three bit columns, where a null is written as a YAML false
-        # (documented flag mapping). The Description value is staged
-        # verbatim (a YAML literal block scalar normalizes a written
-        # value's line breaks to line feeds only when the written YAML is
-        # read back). Every value is computed before the duplicate check
-        # so that the warnings below never read a value of a previous
-        # iteration, and the duplicate warning cites the raw value of the
-        # ignored row.
+        # (documented flag mapping), and except for the four string
+        # columns, where a null is written as the empty string. The
+        # Description value is staged verbatim (a YAML literal block
+        # scalar normalizes a written value's line breaks to line feeds
+        # only when the written YAML is read back). Every value is
+        # computed before the duplicate check so that the warnings below
+        # never read a value of a previous iteration, and the duplicate
+        # warning cites the raw value of the ignored row (a null keeps
+        # its '<null>' citation even though its emitted value is the
+        # empty string).
         $charnameOverride = $row['CharnameOverride']
         if (($null -eq $charnameOverride) -or ($charnameOverride -is [System.DBNull])) {
             $charnameOverride = $null
         }
         else {
             $charnameOverride = [string]$charnameOverride
+        }
+        $charnameOverrideRaw = $charnameOverride
+        if ($null -eq $charnameOverride) {
+            $charnameOverride = ''
         }
 
         $charGender = $row['CharGender']
@@ -140,6 +150,10 @@ function Expand-CharactersFromRagsFile {
         else {
             $currentRoom = [string]$currentRoom
         }
+        $currentRoomRaw = $currentRoom
+        if ($null -eq $currentRoom) {
+            $currentRoom = ''
+        }
 
         $description = $row['Description']
         if (($null -eq $description) -or ($description -is [System.DBNull])) {
@@ -147,6 +161,10 @@ function Expand-CharactersFromRagsFile {
         }
         else {
             $description = [string]$description
+        }
+        $descriptionRaw = $description
+        if ($null -eq $description) {
+            $description = ''
         }
 
         # The managed reader returns bit columns as Boolean values; a
@@ -176,6 +194,10 @@ function Expand-CharactersFromRagsFile {
         else {
             $charPortrait = [string]$charPortrait
         }
+        $charPortraitRaw = $charPortrait
+        if ($null -eq $charPortrait) {
+            $charPortrait = ''
+        }
 
         # Soft-validate the Unique Charname column, as documented for the
         # 'Characters' table in docs/data-mapping.md (only the first
@@ -192,14 +214,14 @@ function Expand-CharactersFromRagsFile {
         }
         if ($duplicate) {
             $evidenceParts = [System.Collections.Generic.List[string]]::new()
-            if ($null -eq $charnameOverride) { $evidenceParts.Add('CharnameOverride <null>') } else { $evidenceParts.Add('CharnameOverride ''' + $charnameOverride + '''') }
+            if ($null -eq $charnameOverrideRaw) { $evidenceParts.Add('CharnameOverride <null>') } else { $evidenceParts.Add('CharnameOverride ''' + $charnameOverrideRaw + '''') }
             if ($null -eq $charGender) { $evidenceParts.Add('CharGender <null>') } else { $evidenceParts.Add('CharGender ' + $charGender) }
-            if ($null -eq $currentRoom) { $evidenceParts.Add('CurrentRoom <null>') } else { $evidenceParts.Add('CurrentRoom ''' + $currentRoom + '''') }
-            if ($null -eq $description) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $description) }
+            if ($null -eq $currentRoomRaw) { $evidenceParts.Add('CurrentRoom <null>') } else { $evidenceParts.Add('CurrentRoom ''' + $currentRoomRaw + '''') }
+            if ($null -eq $descriptionRaw) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $descriptionRaw) }
             $evidenceParts.Add('AllowInventoryInteraction equals ' + $allowInventoryInteraction + ' after reading')
             $evidenceParts.Add('EnterFirstTime equals ' + $enterFirstTime + ' after reading')
             $evidenceParts.Add('LeaveFirstTime equals ' + $leaveFirstTime + ' after reading')
-            if ($null -eq $charPortrait) { $evidenceParts.Add('CharPortrait <null>') } else { $evidenceParts.Add('CharPortrait ''' + $charPortrait + '''') }
+            if ($null -eq $charPortraitRaw) { $evidenceParts.Add('CharPortrait <null>') } else { $evidenceParts.Add('CharPortrait ''' + $charPortraitRaw + '''') }
 
             Write-Warning "Skipping the Characters row $($readRowNumber) of the read result: the Charname value '$charname' duplicates the Charname value of a previously read row (whose column values win). The ignored duplicate row has the column values $($evidenceParts -join ', ')."
             continue

@@ -113,8 +113,9 @@ function Compress-RoomExitsIntoRagsFile {
       whole operation with an exception, as no boolean can be derived
       from it.
     - The DestinationRoom value of an exit is a plain string: a missing
-      or null DestinationRoom value is stored as a null column value
-      without a warning (the expansion emits it as a null YAML value),
+      or null DestinationRoom value is stored as the empty string
+      without a warning, mirroring the null-string emission rule of the
+      expansion (a null column value is emitted as the empty string),
       and an empty or whitespace-only value is kept as is. A scalar
       DestinationRoom value which is not a string is coerced to its
       invariant string form with a warning; a DestinationRoom value
@@ -131,8 +132,8 @@ function Compress-RoomExitsIntoRagsFile {
       silent, so the appended rows carry the lowercased form and
       re-expand without a warning.
     - The PortalObjectName value of an exit is stored like the
-      DestinationRoom value (a missing or null value stored as a null
-      column value without a warning, empty and whitespace-only values
+      DestinationRoom value (a missing or null value stored as the
+      empty string without a warning, empty and whitespace-only values
       kept as is, non-string scalars coerced with a warning, sequences
       and mappings rejected, truncation before the lowercasing), except
       for its lowercase rule: the PortalObjectName value is always
@@ -158,7 +159,8 @@ function Compress-RoomExitsIntoRagsFile {
       ignored duplicate rows will be shown', docs/data-mapping.md,
       RoomExits section): the Direction value, the Active value it was
       read as, and the normalized DestinationRoom and PortalObjectName
-      values, nulls kept as their <null> tokens.
+      values, with the raw missing keys kept as their <null> tokens
+      (a null source value stages the empty string).
     - Exit values are stored as read: no line-ending normalization is
       applied (the verbatim contract of the expansion family - note
       that a multi-line value re-emits through a YAML literal block,
@@ -677,12 +679,13 @@ function Compress-RoomExitsIntoRagsFile {
 
             # The DestinationRoom value of the exit, which the expansion
             # writes as a string scalar. A missing or null value is
-            # stored as a null column value without a warning (the
-            # expansion emits it as a null YAML value); empty and
+            # stored as the empty string without a warning, mirroring the
+            # null-string emission rule of the expansion (a null column
+            # value is emitted as the empty string); empty and
             # whitespace-only strings are kept as is; a scalar of any
             # other type is coerced to its invariant string form with a
             # warning.
-            $stagedDestinationRoom = $null
+            $stagedDestinationRoom = ''
             $exitDestinationRoomValue = $exitValue['DestinationRoom']
             if ($null -ne $exitDestinationRoomValue) {
                 if ($exitDestinationRoomValue -is [System.Collections.IList]) {
@@ -732,11 +735,11 @@ function Compress-RoomExitsIntoRagsFile {
 
             # The PortalObjectName value of the exit, which the expansion
             # writes as a string scalar too. The storage rules are the
-            # DestinationRoom rules above (a missing or null value stored
-            # as a null column value without a warning, empty and
+            # DestinationRoom rules above (a missing or null value
+            # stored as the empty string without a warning, empty and
             # whitespace-only strings kept as is, other scalars coerced
             # with a warning, truncation after the coercion).
-            $stagedPortalObjectName = $null
+            $stagedPortalObjectName = ''
             $exitPortalObjectNameValue = $exitValue['PortalObjectName']
             if ($null -ne $exitPortalObjectNameValue) {
                 if ($exitPortalObjectNameValue -is [System.Collections.IList]) {
@@ -805,19 +808,21 @@ function Compress-RoomExitsIntoRagsFile {
             # boolean Active values are reported as the boolean they were
             # read as (a missing or null Active reports as the false it
             # was read as), and the normalized DestinationRoom and
-            # PortalObjectName values are quoted with their null values
-            # keeping the <null> token.
+            # PortalObjectName values are quoted, with the raw missing
+            # keys keeping the <null> token (a null source value stages
+            # the empty string, mirroring the null-string emission rule
+            # of the expansion).
             if (-not $directionSet.Add($exitDirection)) {
                 $duplicateEvidence = [System.Collections.Generic.List[string]]::new()
                 $duplicateEvidence.Add("Direction $exitDirection")
                 $duplicateEvidence.Add("Active equals $stagedActive after reading")
-                if ($null -eq $stagedDestinationRoom) {
+                if ($null -eq $exitDestinationRoomValue) {
                     $duplicateEvidence.Add('DestinationRoom <null>')
                 }
                 else {
                     $duplicateEvidence.Add("DestinationRoom '$stagedDestinationRoom'")
                 }
-                if ($null -eq $stagedPortalObjectName) {
+                if ($null -eq $exitPortalObjectNameValue) {
                     $duplicateEvidence.Add('PortalObjectName <null>')
                 }
                 else {
@@ -875,21 +880,14 @@ function Compress-RoomExitsIntoRagsFile {
                     $null = $command.Parameters.Add($activeParameter)
 
                     $destinationRoomParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@destinationroom', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.DestinationRoom) {
-                        $destinationRoomParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $destinationRoomParameter.Value = $stagedRow.DestinationRoom
-                    }
+                    # The staged text values are always strings (a null
+                    # source value stages the empty string), so the text
+                    # parameters bind their staged values directly.
+                    $destinationRoomParameter.Value = $stagedRow.DestinationRoom
                     $null = $command.Parameters.Add($destinationRoomParameter)
 
                     $portalObjectNameParameter = [System.Data.SqlServerCe.SqlCeParameter]::new('@portalobjectname', [System.Data.SqlDbType]::NVarChar, 250)
-                    if ($null -eq $stagedRow.PortalObjectName) {
-                        $portalObjectNameParameter.Value = [System.DBNull]::Value
-                    }
-                    else {
-                        $portalObjectNameParameter.Value = $stagedRow.PortalObjectName
-                    }
+                    $portalObjectNameParameter.Value = $stagedRow.PortalObjectName
                     $null = $command.Parameters.Add($portalObjectNameParameter)
 
                     $null = $command.ExecuteNonQuery()

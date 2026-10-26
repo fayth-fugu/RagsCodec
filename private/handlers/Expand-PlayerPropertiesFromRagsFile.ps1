@@ -17,8 +17,9 @@ function Expand-PlayerPropertiesFromRagsFile {
     columns of the PlayerProperties table: the Name key and the Value column value.
     Rows are sorted by Name and then by row ID before they are read, as
     documented ("Table is sorted first by Name ascending, then by ID
-    ascending", docs/data-mapping.md, PlayerProperties section). Every null column
-    value is emitted as a YAML null.
+    ascending", docs/data-mapping.md, PlayerProperties section). A null Value
+    value is emitted as the empty string; every other null column value is
+    emitted as a YAML null.
 
     Rows are expected to hold distinct Name values: the table is sorted by
     Name before it is read, so for every row after the first whose Name
@@ -105,18 +106,24 @@ function Expand-PlayerPropertiesFromRagsFile {
         }
         $name = [string]$name
 
-        # A null column value is written as a YAML null. The Value value is
-        # staged verbatim (its line breaks are kept; the literal block's
+        # A null Value value is written as the empty string. The Value value
+        # is staged verbatim (its line breaks are kept; the literal block's
         # reading rule drifts them to line feeds only when the written file
-        # is parsed again). The value is read before the duplicate check so
-        # that the warning below never reads a value of a previous
-        # iteration.
+        # is parsed again), and the raw value is kept alongside because the
+        # duplicate warning below cites it (a null keeps its '<null>'
+        # citation even though its emitted value is the empty string). The
+        # value is read before the duplicate check so that the warning
+        # below never reads a value of a previous iteration.
         $value = $row['Value']
         if (($null -eq $value) -or ($value -is [System.DBNull])) {
             $value = $null
         }
         else {
             $value = [string]$value
+        }
+        $valueRaw = $value
+        if ($null -eq $value) {
+            $value = ''
         }
 
         # Soft-validate the Unique Name column: a row whose value compares
@@ -134,7 +141,7 @@ function Expand-PlayerPropertiesFromRagsFile {
             }
         }
         if ($duplicate) {
-            if ($null -eq $value) { $valueEvidence = 'Value <null>' } else { $valueEvidence = 'Value ' + $value }
+            if ($null -eq $valueRaw) { $valueEvidence = 'Value <null>' } else { $valueEvidence = 'Value ' + $valueRaw }
 
             Write-Warning "Skipping the PlayerProperties row (ID '$rowId'): the Name value '$name' duplicates the Name value of a previously read row (whose column values win). The ignored duplicate row has the column values Name '$name', $valueEvidence."
             continue

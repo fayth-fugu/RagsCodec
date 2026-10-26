@@ -21,7 +21,9 @@ function Expand-RoomsFromRagsFile {
     line breaks to line feeds when the written YAML is read back, so a
     read-back description carries the line-feed form of whatever line breaks
     the table stores; the value itself is emitted verbatim. Every other null
-    column value is emitted as a YAML null.
+    column value is emitted as a YAML null, except the null values of the
+    string columns (Description, SDesc, Name, RoomPic, Group and
+    LayeredRoomPic), which are emitted as the empty string.
 
     Rows are expected to hold distinct UniqueID values: the table is
     sorted by UniqueID ascending before it is read ("Table is sorted by
@@ -134,18 +136,26 @@ function Expand-RoomsFromRagsFile {
 
         # A null column value is written as a YAML null, except for the bit
         # columns, where a null is written as a YAML false (documented flag
-        # mapping). The Description value is staged verbatim (a YAML literal
-        # block scalar normalizes a written value's line breaks to line
-        # feeds only when the written YAML is read back). Every value is
-        # computed before the duplicate check so that the warnings below
-        # never read a value of a previous iteration (the stale-variable
-        # rule), and the duplicate warning cites the values the row stages.
+        # mapping), and except for the six string columns, where a null is
+        # written as the empty string. The Description value is staged
+        # verbatim (a YAML literal block scalar normalizes a written
+        # value's line breaks to line feeds only when the written YAML is
+        # read back). Every value is computed before the duplicate check
+        # so that the warnings below never read a value of a previous
+        # iteration (the stale-variable rule), and the duplicate warning
+        # cites the raw value of the ignored row (a null keeps its
+        # '<null>' citation even though its emitted value is the empty
+        # string).
         $description = $row['Description']
         if (($null -eq $description) -or ($description -is [System.DBNull])) {
             $description = $null
         }
         else {
             $description = [string]$description
+        }
+        $descriptionRaw = $description
+        if ($null -eq $description) {
+            $description = ''
         }
 
         $sdesc = $row['SDesc']
@@ -155,6 +165,10 @@ function Expand-RoomsFromRagsFile {
         else {
             $sdesc = [string]$sdesc
         }
+        $sdescRaw = $sdesc
+        if ($null -eq $sdesc) {
+            $sdesc = ''
+        }
 
         $name = $row['Name']
         if (($null -eq $name) -or ($name -is [System.DBNull])) {
@@ -162,6 +176,10 @@ function Expand-RoomsFromRagsFile {
         }
         else {
             $name = [string]$name
+        }
+        $nameRaw = $name
+        if ($null -eq $name) {
+            $name = ''
         }
 
         # The RoomPic value is always coerced to lowercase ('Lowercase
@@ -182,6 +200,10 @@ function Expand-RoomsFromRagsFile {
         else {
             $roomPic = ([string]$roomPic).ToLowerInvariant()
         }
+        $roomPicRaw = $roomPic
+        if ($null -eq $roomPic) {
+            $roomPic = ''
+        }
 
         # The LayeredRoomPic value is coerced to lowercase under the same
         # rules, its 'None' passthrough documented for the column itself.
@@ -194,6 +216,10 @@ function Expand-RoomsFromRagsFile {
         }
         else {
             $layeredRoomPic = ([string]$layeredRoomPic).ToLowerInvariant()
+        }
+        $layeredRoomPicRaw = $layeredRoomPic
+        if ($null -eq $layeredRoomPic) {
+            $layeredRoomPic = ''
         }
 
         # The managed reader returns bit columns as Boolean values; a
@@ -218,6 +244,10 @@ function Expand-RoomsFromRagsFile {
         else {
             $group = [string]$group
         }
+        $groupRaw = $group
+        if ($null -eq $group) {
+            $group = ''
+        }
 
         # Soft-validate the Unique UniqueID column: a row whose value
         # compares equal to a previously read row's value, ignoring
@@ -236,14 +266,14 @@ function Expand-RoomsFromRagsFile {
         }
         if ($duplicate) {
             $evidenceParts = [System.Collections.Generic.List[string]]::new()
-            if ($null -eq $description) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $description) }
-            if ($null -eq $sdesc) { $evidenceParts.Add('SDesc <null>') } else { $evidenceParts.Add('SDesc ''' + $sdesc + '''') }
-            if ($null -eq $name) { $evidenceParts.Add('Name <null>') } else { $evidenceParts.Add('Name ''' + $name + '''') }
-            if ($null -eq $roomPic) { $evidenceParts.Add('RoomPic <null>') } else { $evidenceParts.Add('RoomPic ''' + $roomPic + '''') }
+            if ($null -eq $descriptionRaw) { $evidenceParts.Add('Description <null>') } else { $evidenceParts.Add('Description ' + $descriptionRaw) }
+            if ($null -eq $sdescRaw) { $evidenceParts.Add('SDesc <null>') } else { $evidenceParts.Add('SDesc ''' + $sdescRaw + '''') }
+            if ($null -eq $nameRaw) { $evidenceParts.Add('Name <null>') } else { $evidenceParts.Add('Name ''' + $nameRaw + '''') }
+            if ($null -eq $roomPicRaw) { $evidenceParts.Add('RoomPic <null>') } else { $evidenceParts.Add('RoomPic ''' + $roomPicRaw + '''') }
             $evidenceParts.Add('EnterFirstTime equals ' + $enterFirstTime + ' after reading')
             $evidenceParts.Add('LeaveFirstTime equals ' + $leaveFirstTime + ' after reading')
-            if ($null -eq $group) { $evidenceParts.Add('Group <null>') } else { $evidenceParts.Add('Group ''' + $group + '''') }
-            if ($null -eq $layeredRoomPic) { $evidenceParts.Add('LayeredRoomPic <null>') } else { $evidenceParts.Add('LayeredRoomPic ''' + $layeredRoomPic + '''') }
+            if ($null -eq $groupRaw) { $evidenceParts.Add('Group <null>') } else { $evidenceParts.Add('Group ''' + $groupRaw + '''') }
+            if ($null -eq $layeredRoomPicRaw) { $evidenceParts.Add('LayeredRoomPic <null>') } else { $evidenceParts.Add('LayeredRoomPic ''' + $layeredRoomPicRaw + '''') }
 
             Write-Warning "Skipping the Rooms row $($readRowNumber) of the read result: the UniqueID value '$uniqueId' duplicates the UniqueID value of a previously read row (whose column values win). The ignored duplicate row has the column values $($evidenceParts -join ', ')."
             continue

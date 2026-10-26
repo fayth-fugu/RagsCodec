@@ -17,8 +17,8 @@ function Expand-CharacterPropertiesFromRagsFile {
     Each entry is a mapping of the Charname value and the Name key whose
     value is a sequence of mappings, one per CharacterProperties row of
     that character; each of those holds the property Name and its Value.
-    The Value of a row is emitted as a YAML null when the column is null;
-    multi-line values are emitted as YAML literal block scalars. YAML
+    The Value of a row is emitted as the empty string when the column is
+    null; multi-line values are emitted as YAML literal block scalars. YAML
     normalizes a literal block's line breaks to line feeds when the
     written YAML is read back, so a read-back value carries the line-feed
     form of whatever line breaks the table stores; the value itself is
@@ -141,19 +141,25 @@ function Expand-CharacterPropertiesFromRagsFile {
         }
         $properties = $groupProperties[$groupIndex]
 
-        # A null Value column is a meaningful property value (it is emitted
-        # as a YAML null); every other value is read as a string and staged
-        # verbatim (a YAML literal block scalar normalizes a written
-        # value's line breaks to line feeds only when the written YAML is
-        # read back). Values are never skipped, and the value is read
-        # before the duplicate check below so that the ignored duplicate
-        # row's warning can report the ignored row's own raw value.
+        # A null Value column is a meaningful property value (it is
+        # emitted as the empty string); every other value is read as a
+        # string and staged verbatim (a YAML literal block scalar
+        # normalizes a written value's line breaks to line feeds only
+        # when the written YAML is read back). Values are never skipped,
+        # and the raw value is read before the duplicate check below so
+        # that the ignored duplicate row's warning can report the ignored
+        # row's own raw value (a null keeps its '<null>' citation even
+        # though its emitted value is the empty string).
         $propertyValue = $row['Value']
         if (($null -eq $propertyValue) -or ($propertyValue -is [System.DBNull])) {
             $propertyValue = $null
         }
         else {
             $propertyValue = [string]$propertyValue
+        }
+        $propertyValueRaw = $propertyValue
+        if ($null -eq $propertyValue) {
+            $propertyValue = ''
         }
 
         # Soft-validate the Unique Name column, as documented for the
@@ -173,7 +179,7 @@ function Expand-CharacterPropertiesFromRagsFile {
             }
         }
         if ($duplicate) {
-            Write-Warning "Skipping the CharacterProperties row of character '$charname' (ID '$rowId'): the property name '$propertyName' duplicates the property name of a previously read row (whose value wins). The ignored duplicate row has the value $(if ($null -eq $propertyValue) { '<null>' } else { [string]$propertyValue })."
+            Write-Warning "Skipping the CharacterProperties row of character '$charname' (ID '$rowId'): the property name '$propertyName' duplicates the property name of a previously read row (whose value wins). The ignored duplicate row has the value $(if ($null -eq $propertyValueRaw) { '<null>' } else { [string]$propertyValueRaw })."
             continue
         }
 

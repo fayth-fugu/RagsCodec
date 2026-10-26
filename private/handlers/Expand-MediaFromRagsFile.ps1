@@ -26,7 +26,7 @@ function Expand-MediaFromRagsFile {
     string. The UseEnhancedGraphics flag column is emitted as a YAML
     boolean where a missing value is read as false (the documented flag
     mapping). Every other column value is emitted as a plain string or, if
-    missing, as a YAML null.
+    missing, as the empty string.
 
     A media Name is always emitted in the lowercased form the table's
     Unique handling documents ('Values are case-insensitive' / 'Always
@@ -141,18 +141,26 @@ function Expand-MediaFromRagsFile {
 
         # A null column value is written as a YAML null, except for the
         # UseEnhancedGraphics bit column, where a null is written as a YAML
-        # false (documented flag mapping). The Data column holds the media
-        # byte stream: a missing value is written as a YAML null, and a
-        # present value is Base64 encoded (without line breaks) into the
-        # plain string value that is emitted. Every value is computed
-        # before the duplicate check so that the warnings below never read
-        # a value of a previous iteration (the stale-variable rule).
+        # false (documented flag mapping), and except for the six string
+        # columns, where a null is written as the empty string. The Data
+        # column holds the media byte stream: a missing value is written
+        # as a YAML null, and a present value is Base64 encoded (without
+        # line breaks) into the plain string value that is emitted. Every
+        # value is computed before the duplicate check so that the
+        # warnings below never read a value of a previous iteration (the
+        # stale-variable rule), and the duplicate warning cites the raw
+        # value of the ignored row (a null keeps its '<null>' citation
+        # even though its emitted value is the empty string).
         $backgroundColor = $row['BackgroundColor']
         if (($null -eq $backgroundColor) -or ($backgroundColor -is [System.DBNull])) {
             $backgroundColor = $null
         }
         else {
             $backgroundColor = [string]$backgroundColor
+        }
+        $backgroundColorRaw = $backgroundColor
+        if ($null -eq $backgroundColor) {
+            $backgroundColor = ''
         }
 
         $textColor = $row['TextColor']
@@ -162,6 +170,10 @@ function Expand-MediaFromRagsFile {
         else {
             $textColor = [string]$textColor
         }
+        $textColorRaw = $textColor
+        if ($null -eq $textColor) {
+            $textColor = ''
+        }
 
         $textFont = $row['TextFont']
         if (($null -eq $textFont) -or ($textFont -is [System.DBNull])) {
@@ -170,6 +182,10 @@ function Expand-MediaFromRagsFile {
         else {
             $textFont = [string]$textFont
         }
+        $textFontRaw = $textFont
+        if ($null -eq $textFont) {
+            $textFont = ''
+        }
 
         $imageName = $row['ImageName']
         if (($null -eq $imageName) -or ($imageName -is [System.DBNull])) {
@@ -177,6 +193,10 @@ function Expand-MediaFromRagsFile {
         }
         else {
             $imageName = [string]$imageName
+        }
+        $imageNameRaw = $imageName
+        if ($null -eq $imageName) {
+            $imageName = ''
         }
 
         # The managed reader returns bit columns as Boolean values; a
@@ -196,6 +216,10 @@ function Expand-MediaFromRagsFile {
         else {
             $newImage = [string]$newImage
         }
+        $newImageRaw = $newImage
+        if ($null -eq $newImage) {
+            $newImage = ''
+        }
 
         # The Data column is the binary image column of the table; the
         # managed reader materializes a present value as a byte stream
@@ -214,6 +238,10 @@ function Expand-MediaFromRagsFile {
         }
         else {
             $groupName = [string]$groupName
+        }
+        $groupNameRaw = $groupName
+        if ($null -eq $groupName) {
+            $groupName = ''
         }
 
         # Soft-validate the Unique Name column: a row whose value compares
@@ -235,13 +263,13 @@ function Expand-MediaFromRagsFile {
         }
         if ($duplicate) {
             $evidenceParts = [System.Collections.Generic.List[string]]::new()
-            if ($null -eq $backgroundColor) { $evidenceParts.Add('BackgroundColor <null>') } else { $evidenceParts.Add('BackgroundColor ''' + $backgroundColor + '''') }
-            if ($null -eq $textColor) { $evidenceParts.Add('TextColor <null>') } else { $evidenceParts.Add('TextColor ''' + $textColor + '''') }
-            if ($null -eq $textFont) { $evidenceParts.Add('TextFont <null>') } else { $evidenceParts.Add('TextFont ''' + $textFont + '''') }
-            if ($null -eq $imageName) { $evidenceParts.Add('ImageName <null>') } else { $evidenceParts.Add('ImageName ''' + $imageName + '''') }
+            if ($null -eq $backgroundColorRaw) { $evidenceParts.Add('BackgroundColor <null>') } else { $evidenceParts.Add('BackgroundColor ''' + $backgroundColorRaw + '''') }
+            if ($null -eq $textColorRaw) { $evidenceParts.Add('TextColor <null>') } else { $evidenceParts.Add('TextColor ''' + $textColorRaw + '''') }
+            if ($null -eq $textFontRaw) { $evidenceParts.Add('TextFont <null>') } else { $evidenceParts.Add('TextFont ''' + $textFontRaw + '''') }
+            if ($null -eq $imageNameRaw) { $evidenceParts.Add('ImageName <null>') } else { $evidenceParts.Add('ImageName ''' + $imageNameRaw + '''') }
             $evidenceParts.Add('UseEnhancedGraphics equals ' + $useEnhancedGraphics + ' after reading')
-            if ($null -eq $newImage) { $evidenceParts.Add('NewImage <null>') } else { $evidenceParts.Add('NewImage ''' + $newImage + '''') }
-            if ($null -eq $groupName) { $evidenceParts.Add('GroupName <null>') } else { $evidenceParts.Add('GroupName ''' + $groupName + '''') }
+            if ($null -eq $newImageRaw) { $evidenceParts.Add('NewImage <null>') } else { $evidenceParts.Add('NewImage ''' + $newImageRaw + '''') }
+            if ($null -eq $groupNameRaw) { $evidenceParts.Add('GroupName <null>') } else { $evidenceParts.Add('GroupName ''' + $groupNameRaw + '''') }
 
             Write-Warning "Skipping the Media row $($readRowNumber) of the read result: the Name value '$name' duplicates the Name value of a previously read row (whose column values win). The ignored duplicate row has the column values $($evidenceParts -join ', ')."
             continue
